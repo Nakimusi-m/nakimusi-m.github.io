@@ -69,6 +69,7 @@ function updateFx(dt) {
     if (comboPop > 0) comboPop = Math.max(0, comboPop - dt / 0.25);
   }
   if (gridPulse > 0) gridPulse = Math.max(0, gridPulse - dt / 0.45);
+  if (flashWhite > 0) flashWhite = Math.max(0, flashWhite - dt / 0.55);
   if (player && player.muzzle > 0) player.muzzle -= dt;
 }
 

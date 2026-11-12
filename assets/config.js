@@ -160,20 +160,30 @@ var BOSS_HP_MUL = 1.25;          // 2回目以降、登場ごとにHPがこの�
 var BOSS_SPEED = 54;             // 第1段階の移動速度
 var BOSS_SPEED_P2 = 78;          // 第2段階は少し速くなる
 var BOSS_KEEP_DIST = 380;        // 自機と保つ間合い
-var BOSS_TURRET_FIRE_INTERVAL = 0.14; // 砲塔の拡散弾の発射間隔（秒）
-var BOSS_TURRET_BULLET_SPEED = 170;   // 砲塔の弾速
+var BOSS_TURRET_FIRE_INTERVAL = 0.28; // 砲塔の拡散弾の発射間隔（秒）。バランス調整で従来の2倍
+var BOSS_TURRET_BULLET_SPEED = 255;   // 砲塔の弾速（従来の1.5倍）
 var BOSS_TURRET_SWING_AMP = 0.7;      // 砲身スイングの振れ幅（rad、約±40°）
 var BOSS_TURRET_SWING_PERIOD = 2.4;   // スイングの周期（秒）。左右で位相をずらす
-var BOSS_ICE_INTERVAL = 4.5;     // 氷結弾の間隔（秒、遅め）
-var BOSS_ICE_MIN_INTERVAL = 3.2; // 登場回数で短くなる下限（秒）
+// 砲塔の攻撃サイクル：拡散→チャージ（予告）→自機狙い3連バースト→拡散…
+// 1門ごとに独立して回り、左右は半周期ずらして交互にバーストが来るようにする
+var BOSS_TURRET_SPREAD_TIME = 2.6;  // 拡散フェイズの長さ（秒）
+var BOSS_TURRET_CHARGE_TIME = 0.4;  // チャージ（発射停止・砲身が光る予告）の長さ（秒）
+var BOSS_BURST_COUNT = 3;           // バーストの連射数
+var BOSS_BURST_INTERVAL = 0.12;     // バースト各発の間隔（秒）
+var BOSS_BURST_SPEED = 340;         // バースト弾の速さ（拡散弾より速め。威力は拡散弾と同じ-5）
+var BOSS_ICE_INTERVAL = 6.0;     // 第1段階の氷結弾の間隔（秒、遅め）
+var BOSS_ICE_MIN_INTERVAL = 4.4; // 登場回数で短くなる下限（秒。第2段階の間隔より長く保つ）
+var BOSS_ICE_P2_INTERVAL = 4.0;  // 第2段階の氷結弾の間隔（秒）。砲塔が無くなっても打ち続け、第1段階より短い
+var BOSS_ICE_SPREAD = 0.349;     // 氷結弾の拡散角（rad、±20°）。中心方向と合わせて3発同時
+var BOSS_ICE_RADIUS = 138;       // ボス氷結弾の凍結エリア半径（フロスターの230の60%）
 var BOSS_ICE_SPEED = 330;        // 氷結弾の飛翔速度
 var BOSS_ICE_DMG = 10;           // 氷結弾の直撃ダメージ
 var BOSS_SUMMON_INTERVAL = 12;   // ダーター召喚の間隔（秒）
 var BOSS_SUMMON_FIRST = 6;       // 登場後の初回召喚までの時間（秒）
 var BOSS_SUMMON_COUNT = 5;       // 1回の召喚数
 var BOSS_SUMMON_ALIVE_MAX = 2;   // 召喚ダーターがこの数以下なら召喚する
-var BOSS_SPIRAL_INTERVAL = 0.12; // 第2段階の回転弾幕の発射間隔（秒）
-var BOSS_SPIRAL_SPEED = 215;     // 回転弾幕の弾速（威力は拡散弾と同じ-5）
+var BOSS_SPIRAL_INTERVAL = 0.24; // 第2段階の回転弾幕の発射間隔（秒）。バランス調整で従来の2倍
+var BOSS_SPIRAL_SPEED = 322;     // 回転弾幕の弾速（従来の1.5倍。威力は拡散弾と同じ-5）
 var BOSS_CHARGE_TELEGRAPH = 0.8; // 突進予告の長さ（秒）
 var BOSS_CHARGE_SPEED = 285;     // 低速突進の速度
 var BOSS_CHARGE_TIME = 0.85;     // 突進の持続（秒）
@@ -183,6 +193,7 @@ var BOSS_SCORE_FINAL = 5000;     // 処刑完了（大爆発）のスコア
 var BOSS_HEAL = 20;              // 撃破報酬：自機HP回復量
 var BOSS_EXEC_LIMIT = 12;        // 処刑フェイズでODタイマーを止める上限（秒）
 var BOSS_QUIET_TIME = 3.5;       // 撃破後の静けさ（通常湧き再開まで、秒）
+var BOSS_FINISH_FX_TIME = 0.8;   // 処刑完了時、大爆発の前に残骸の各所で小〜中爆発が連続する時間（秒）
 
 // ---- 演出の数値（衝撃波リング・シェイク） ----
 var RING_BASE_SPEED = 2600, RING_SPEED_PER_TIER = 800;  // 耐久1で2600、耐久3で3400
