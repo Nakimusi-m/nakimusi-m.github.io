@@ -137,7 +137,8 @@ var DARTER_FAR_DIST = 280;       // ダーター同士の出現点の最小間�
 var NEW_MIX = { tank: 0.06, darter: 0.18, splitter: 0.30, spiral: 0.41, guardian: 0.53, bomber: 0.65, froster: 0.76, sniper: 0.88 }; // 新敵枠の内訳（累積）。残りはアンプ。タンクは従来どおりレア、他はほぼ均等
 
 // ---- 難易度カーブ（computeDiff が参照） ----
-var DIFF_RAMP_TIME = 120;        // この秒数でほぼ上限（2分）
+var DIFF_RAMP_TIME = 120;        // 速さ・割合の上昇はこの秒数でほぼ上限（2分）
+var DIFF_SPAWN_RAMP_TIME = 435;  // 出現間隔だけは緩やか：この秒数かけて下限へ（180秒時点の出現量が従来カーブの約半分になる）
 var DIFF_SPAWN_START = 0.92, DIFF_SPAWN_DROP = 0.58; // 出現間隔 0.92s → 0.34s
 var DIFF_SPEED_MUL_MAX = 0.55;   // 敵速の上昇 +55%
 var DIFF_HEX_START = 0.10, DIFF_HEX_GAIN = 0.13;     // 射撃敵の割合
@@ -160,21 +161,21 @@ var BOSS_HP_MUL = 1.25;          // 2回目以降、登場ごとにHPがこの�
 var BOSS_SPEED = 54;             // 第1段階の移動速度
 var BOSS_SPEED_P2 = 78;          // 第2段階は少し速くなる
 var BOSS_KEEP_DIST = 380;        // 自機と保つ間合い
-var BOSS_TURRET_FIRE_INTERVAL = 0.28; // 砲塔の拡散弾の発射間隔（秒）。バランス調整で従来の2倍
+var BOSS_TURRET_FIRE_INTERVAL = 0.56; // 砲塔の拡散弾の発射間隔（秒）。バースト強化に合わせて発射レートを半分に（従来0.28）
 var BOSS_TURRET_BULLET_SPEED = 255;   // 砲塔の弾速（従来の1.5倍）
 var BOSS_TURRET_SWING_AMP = 0.7;      // 砲身スイングの振れ幅（rad、約±40°）
 var BOSS_TURRET_SWING_PERIOD = 2.4;   // スイングの周期（秒）。左右で位相をずらす
-// 砲塔の攻撃サイクル：拡散→チャージ（予告）→自機狙い3連バースト→拡散…
+// 砲塔の攻撃サイクル：拡散→チャージ（予告）→自機狙い5連バースト→拡散…
 // 1門ごとに独立して回り、左右は半周期ずらして交互にバーストが来るようにする
 var BOSS_TURRET_SPREAD_TIME = 2.6;  // 拡散フェイズの長さ（秒）
 var BOSS_TURRET_CHARGE_TIME = 0.4;  // チャージ（発射停止・砲身が光る予告）の長さ（秒）
-var BOSS_BURST_COUNT = 3;           // バーストの連射数
+var BOSS_BURST_COUNT = 5;           // バーストの連射数
 var BOSS_BURST_INTERVAL = 0.12;     // バースト各発の間隔（秒）
-var BOSS_BURST_SPEED = 340;         // バースト弾の速さ（拡散弾より速め。威力は拡散弾と同じ-5）
+var BOSS_BURST_SPEED = 600;         // バースト弾の速さ（拡散弾の2倍超の高速弾。威力は拡散弾と同じ-5）
 var BOSS_ICE_INTERVAL = 6.0;     // 第1段階の氷結弾の間隔（秒、遅め）
 var BOSS_ICE_MIN_INTERVAL = 4.4; // 登場回数で短くなる下限（秒。第2段階の間隔より長く保つ）
 var BOSS_ICE_P2_INTERVAL = 4.0;  // 第2段階の氷結弾の間隔（秒）。砲塔が無くなっても打ち続け、第1段階より短い
-var BOSS_ICE_SPREAD = 0.349;     // 氷結弾の拡散角（rad、±20°）。中心方向と合わせて3発同時
+var BOSS_ICE_SCATTER_MIN = 130, BOSS_ICE_SCATTER_MAX = 230; // 氷結弾3発のうち2発は、目標点からこの距離だけランダムな向きに離れた点へ着弾する（向きは発ごとに独立）
 var BOSS_ICE_RADIUS = 138;       // ボス氷結弾の凍結エリア半径（フロスターの230の60%）
 var BOSS_ICE_SPEED = 330;        // 氷結弾の飛翔速度
 var BOSS_ICE_DMG = 10;           // 氷結弾の直撃ダメージ
