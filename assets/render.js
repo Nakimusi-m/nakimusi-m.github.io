@@ -112,7 +112,7 @@ function draw() {
   // ボス本体と砲塔
   if (boss) drawBoss();
 
-  // 氷結弾（ボス第1段階）：飛行中の氷弾と、着弾点のマーカー
+  // 氷結弾（ボス両段階）：飛行中の氷弾と、着弾点のマーカー
   for (i = 0; i < iceShots.length; i++) {
     var ish = iceShots[i];
     var ik = Math.min(ish.t / ish.dur, 1);
@@ -213,8 +213,8 @@ function draw() {
   ctx.textAlign = "center";
   for (i = 0; i < popups.length; i++) {
     var t = popups[i];
-    var baseSize = t.big ? 17 : 13;
-    ctx.font = "700 " + Math.round(baseSize + t.pop * 10) + "px Orbitron, monospace";
+    var baseSize = t.huge ? 30 : (t.big ? 17 : 13);
+    ctx.font = "700 " + Math.round(baseSize + t.pop * (t.huge ? 18 : 10)) + "px Orbitron, monospace";
     ctx.globalAlpha = Math.min(t.life / 0.4, 1);
     ctx.fillStyle = t.color;
     ctx.fillText(t.text, t.x, t.y);
@@ -222,6 +222,15 @@ function draw() {
   ctx.globalAlpha = 1;
 
   ctx.restore();
+
+  // 白フラッシュ（ボス大爆発の瞬間）：画面全体を一瞬白く染める
+  if (flashWhite > 0) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(flashWhite, 1) * 0.85;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.restore();
+  }
 
   // ボスが画面外にいる時は、画面端に方向矢印で居場所を示す
   if (boss && (state === "playing" || state === "paused")) {
@@ -328,7 +337,7 @@ function drawMinimap() {
 // 処刑フェイズの残骸は暗く点滅し、撃たれた直後は震える。
 function drawBoss() {
   var b = boss;
-  var exec = b.phase === "exec";
+  var exec = b.phase === "exec" || b.phase === "finish"; // 撃破演出中も残骸の見た目
   var ox = 0, oy = 0;
   if (b.shakeT > 0) { ox = rand(-3.5, 3.5); oy = rand(-3.5, 3.5); }
   var flicker = exec && Math.floor(performance.now() / 130) % 3 === 0;
@@ -369,6 +378,17 @@ function drawBoss() {
     ctx.rotate(tr.aim);
     ctx.fillStyle = tr.flash > 0 ? "#ffffff" : "#bfefff";
     ctx.fillRect(6, -5, BOSS_TURRET_R + 14, 10);
+    // チャージ中は砲口が明滅して光る（バースト発射の予告）
+    if (tr.mode === "charge") {
+      var cpulse = 0.55 + 0.45 * Math.sin(performance.now() / 45);
+      ctx.fillStyle = "rgba(255, 214, 106, " + cpulse.toFixed(3) + ")";
+      ctx.shadowColor = "#ffd76a";
+      ctx.shadowBlur = 20;
+      ctx.beginPath(); ctx.arc(BOSS_TURRET_R + 16, 0, 5 + 4 * cpulse, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#fff3cf";
+      ctx.beginPath(); ctx.arc(BOSS_TURRET_R + 16, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
     ctx.fillStyle = "#eaf9ff";
     ctx.beginPath(); ctx.arc(tr.x + ox, tr.y + oy, 3.5, 0, Math.PI * 2); ctx.fill();
@@ -449,7 +469,7 @@ function drawBoss() {
   }
 
   // 処刑フェイズの残り裏HP（残骸の上に小さな金バー）
-  if (exec) {
+  if (b.phase === "exec") {
     ctx.fillStyle = "rgba(255,255,255,0.22)";
     ctx.fillRect(b.x - 44, b.y - b.r - 16, 88, 4);
     ctx.fillStyle = "#ffc233";
