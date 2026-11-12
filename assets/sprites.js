@@ -32,31 +32,6 @@ function buildEnemySprite(t, flash) {
   var pts = shapePoints({ shape: t.shape, r: t.r, rot: 0 });
   return makeSprite(half * 2, half * 2, function (g) {
     var main = flash ? "#ffffff" : t.color;
-    if (t.shape === "snowflake") {
-      // 雪の結晶：中心から6本の枝と、枝の中ほどの小枝
-      g.shadowColor = t.color;
-      g.shadowBlur = 14;
-      g.lineWidth = 2.5;
-      g.lineCap = "round";
-      g.strokeStyle = main;
-      g.beginPath();
-      for (var fi = 0; fi < 6; fi++) {
-        var fa = fi * Math.PI / 3;
-        var fx2 = Math.cos(fa), fy2 = Math.sin(fa);
-        g.moveTo(0, 0);
-        g.lineTo(fx2 * t.r, fy2 * t.r);
-        var bx2 = fx2 * t.r * 0.55, by2 = fy2 * t.r * 0.55, bl = t.r * 0.34;
-        g.moveTo(bx2, by2);
-        g.lineTo(bx2 + Math.cos(fa - 0.7) * bl, by2 + Math.sin(fa - 0.7) * bl);
-        g.moveTo(bx2, by2);
-        g.lineTo(bx2 + Math.cos(fa + 0.7) * bl, by2 + Math.sin(fa + 0.7) * bl);
-      }
-      g.stroke();
-      g.shadowBlur = 0;
-      g.fillStyle = main;
-      g.beginPath(); g.arc(0, 0, 3, 0, Math.PI * 2); g.fill();
-      return;
-    }
     if (t.shape === "ring") {
       // リング（ドーナツ型）：太い輪と中心の小さな芯
       g.shadowColor = t.color;
