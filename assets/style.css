@@ -150,6 +150,50 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #core-wrap.active .core-od, #core-wrap.active #od-num { color: #ffd968; }
 @keyframes odBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+/* ---------- ボスバー（画面上部中央、ボス戦中だけ表示） ---------- */
+#boss-wrap {
+  position: absolute; left: 50%; top: calc(10px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  width: min(430px, 46vw);
+  padding: 6px 10px 8px;
+  background: linear-gradient(115deg, rgba(16, 34, 56, 0.88), rgba(5, 10, 22, 0.66));
+  border: 1px solid rgba(127, 216, 255, 0.5);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  box-shadow: 0 0 16px rgba(127, 216, 255, 0.22);
+  pointer-events: none;
+}
+#boss-wrap[hidden] { display: none; }
+#boss-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  font-family: Orbitron, monospace; font-size: 9px; letter-spacing: 0.24em;
+  color: #bfefff; white-space: nowrap;
+}
+#boss-phase { color: var(--text-dim); letter-spacing: 0.18em; }
+#boss-wrap.phase2 #boss-phase { color: #ff8a8a; }
+#boss-bar {
+  margin-top: 4px; height: 8px; overflow: hidden;
+  background: rgba(2, 6, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+#boss-fill {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #2e7fb8, #7fd8ff, #d8f6ff);
+  box-shadow: 0 0 10px rgba(127, 216, 255, 0.7);
+  transition: width 0.15s ease-out;
+}
+#boss-wrap.phase2 #boss-fill { background: linear-gradient(90deg, #a13232, #ff6a5e, #ffc9a8); box-shadow: 0 0 10px rgba(255, 106, 94, 0.7); }
+/* 処刑フェイズ突入時、バーが砕けて消える */
+#boss-wrap.shatter { animation: bossShatter 0.6s ease-in forwards; }
+@keyframes bossShatter {
+  0% { transform: translateX(-50%); opacity: 1; }
+  20% { transform: translateX(calc(-50% - 5px)) rotate(-1.2deg); }
+  45% { transform: translateX(calc(-50% + 5px)) rotate(1deg); opacity: 0.9; }
+  70% { transform: translateX(calc(-50% - 3px)) translateY(5px) rotate(-0.6deg); opacity: 0.45; }
+  100% { transform: translateX(-50%) translateY(12px); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #boss-wrap.shatter { animation-duration: 0.15s; }
+}
 /* 発動中だけ画面の縁を金色に光らせる層 */
 #od-glow {
   position: absolute; inset: 0; pointer-events: none; z-index: 2;
@@ -285,6 +329,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .howto .pc-row { display: none; }
   .howto .weapon-row { display: none; }
   .howto .od-row { display: none; }
+  .howto .boss-row { display: none; }
   .icon-btn { width: 36px; height: 36px; min-height: 36px; }
   .btn-row { margin-top: 8px; gap: 8px; flex-wrap: nowrap; }
   .big-btn { min-height: 36px; font-size: 13px; padding: 0 24px; }

@@ -32,6 +32,9 @@ function buildEnemySprite(t, flash) {
   var pts = shapePoints({ shape: t.shape, r: t.r, rot: 0 });
   return makeSprite(half * 2, half * 2, function (g) {
     var main = flash ? "#ffffff" : t.color;
+    // フロスター（snowflake）も他の敵と共通の描き方にする：
+    // shapePoints の12点星型（氷の結晶のシルエット）を、輪郭線＋
+    // 半透明の塗り＋中心点で描く。枝線だけの線画にはしない。
     if (t.shape === "ring") {
       // リング（ドーナツ型）：太い輪と中心の小さな芯
       g.shadowColor = t.color;
@@ -219,7 +222,7 @@ function shapePoints(e) {
       pts.push([Math.cos(a) * rr2, Math.sin(a) * rr2]);
     }
   } else if (e.shape === "snowflake") {
-    // 雪の結晶の外形（破片描画用）：6方向に尖った12点の星型
+    // 氷の結晶の外形（スプライト・破片共通）：6方向に尖った12点の星型
     for (i = 0; i < 12; i++) {
       a = e.rot - Math.PI / 2 + i * Math.PI / 6;
       var rs = i % 2 === 0 ? r : r * 0.42;
@@ -231,6 +234,12 @@ function shapePoints(e) {
   } else if (e.shape === "ring") {
     for (i = 0; i < 20; i++) {
       a = i * Math.PI / 10;
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+  } else if (e.shape === "octagon") {
+    // 八角形（ボス本体の破片用）
+    for (i = 0; i < 8; i++) {
+      a = e.rot + i * Math.PI / 4;
       pts.push([Math.cos(a) * r, Math.sin(a) * r]);
     }
   } else { // hexagon
