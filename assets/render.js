@@ -584,11 +584,11 @@ function drawDrones() {
     ctx.shadowBlur = 0;
     ctx.restore();
     // 傷ついた子機は上に小さなHPバー
-    if (!d.down && d.hp < DRONE_HP) {
+    if (!d.down && d.hp < d.maxHp) {
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.fillRect(d.x - 8, d.y - 15, 16, 2.5);
       ctx.fillStyle = DRONE_ROLES[d.role].color;
-      ctx.fillRect(d.x - 8, d.y - 15, 16 * Math.max(d.hp, 0) / DRONE_HP, 2.5);
+      ctx.fillRect(d.x - 8, d.y - 15, 16 * Math.max(d.hp, 0) / d.maxHp, 2.5);
     }
     // 機能停止中：復帰までの円形ゲージ
     if (d.down) {
