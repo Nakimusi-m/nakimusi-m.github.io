@@ -76,6 +76,18 @@ function sfxOverdriveEnd() {
   tone(784, 392, 0.2, "triangle", 0.07);
 }
 function sfxEnemyShoot() { tone(880, 620, 0.07, "triangle", 0.02); }
+// ボス登場予告の警報：2音のサイレンを繰り返す
+function sfxWarning() {
+  if (!soundOn || !audioCtx) return;
+  tone(440, 440, 0.16, "square", 0.055);
+  setTimeout(function () { tone(349, 349, 0.16, "square", 0.055); }, 180);
+}
+// バリア崩壊：下降音＋ノイズで「割れた」ことを知らせる
+function sfxBarrierDown() {
+  if (!soundOn || !audioCtx) return;
+  tone(1200, 180, 0.35, "sawtooth", 0.07);
+  noiseBurst(0.3, 2600, 0.09);
+}
 function sfxGameOver() {
   tone(392, 392, 0.16, "square", 0.08);
   setTimeout(function () { tone(311, 311, 0.16, "square", 0.08); }, 170);

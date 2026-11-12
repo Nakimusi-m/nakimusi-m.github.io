@@ -54,6 +54,10 @@
           <div id="core-head"><span>HP<span id="hp-num">100</span></span><span class="core-od">OVERDRIVE<span id="od-num">0%</span></span></div>
           <div id="core-bar"><div id="hp-fill"></div><div id="od-fill"></div></div>
         </div>
+        <div id="boss-wrap" hidden>
+          <div id="boss-head"><span class="boss-name">PERMAFROST</span><span id="boss-phase">PHASE 1</span></div>
+          <div id="boss-bar"><div id="boss-fill"></div></div>
+        </div>
       </div>
 
       <div class="overlay" id="ov-title">
@@ -66,6 +70,7 @@
           <li class="weapon-row"><span class="k">WEAPON</span>ツインノズル ― 弾を2本同時発射・連射速度2倍（1発のダメージは小さめ）</li>
           <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 8秒間、弾が4本（端は少し後ろから）になり弾速3倍・貫通、自機も金色に加速</li>
           <li class="pc-row"><span class="k">PC</span>WASD／矢印キーで移動、マウスで狙ってクリックで射撃</li>
+          <li class="boss-row"><span class="k">BOSS</span>90秒ごとに要塞ボス「ペルマフロスト」出現 ― 砲塔を壊してバリアを割り、本体を倒すと処刑タイム。ボス戦中はゲージが貯まらない</li>
           <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
         </ul>
         <div class="enemy-legend" aria-hidden="true">
@@ -106,7 +111,7 @@
             <figcaption>自爆 ・ 200</figcaption>
           </figure>
           <figure>
-            <svg viewBox="-20 -20 40 40"><g stroke="#7fd8ff" stroke-width="2.5" stroke-linecap="round"><path d="M0 -13 V13 M-11 -6.5 L11 6.5 M-11 6.5 L11 -6.5"/></g><circle cx="0" cy="0" r="2.5" fill="#7fd8ff"/></svg>
+            <svg viewBox="-20 -20 40 40"><path d="M0 -13 L2.7 -4.7 L11.3 -6.5 L5.5 0 L11.3 6.5 L2.7 4.7 L0 13 L-2.7 4.7 L-11.3 6.5 L-5.5 0 L-11.3 -6.5 L-2.7 -4.7 Z" fill="none" stroke="#7fd8ff" stroke-width="2.5"/></svg>
             <figcaption>凍結エリア ・ 200</figcaption>
           </figure>
           <figure>
@@ -116,6 +121,10 @@
           <figure>
             <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/></svg>
             <figcaption>支援 ・ 300</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><polygon points="6,-14 14,-6 14,6 6,14 -6,14 -14,6 -14,-6 -6,-14" fill="none" stroke="#7fd8ff" stroke-width="3"/><circle cx="0" cy="0" r="3.5" fill="#7fd8ff"/></svg>
+            <figcaption>ボス ・ 5000</figcaption>
           </figure>
         </div>
         <div class="btn-row">

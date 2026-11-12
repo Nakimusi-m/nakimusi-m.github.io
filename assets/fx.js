@@ -95,7 +95,9 @@ function killEnemy(e) {
   score += e.score;
   // オーバードライブのゲージ：撃破で貯まる（発動中は貯まらない）。
   // 満タンになった瞬間に自動発動する。
-  if (!odActive) {
+  // ボス戦中は一切貯まらない（bossGaugeLocked は game.js。召喚ダーター
+  // なども対象外で、満タンになるのはボス本体を倒し切った時だけ）。
+  if (!odActive && !bossGaugeLocked()) {
     odGauge += OD_GAIN[e.type] || 4;
     if (odGauge >= 100) activateOverdrive();
   }

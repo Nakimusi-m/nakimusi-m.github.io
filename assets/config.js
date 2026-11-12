@@ -144,6 +144,46 @@ var DIFF_HEX_START = 0.10, DIFF_HEX_GAIN = 0.13;     // 射撃敵の割合
 var DIFF_AIMED_RAMP_TIME = 90, DIFF_AIMED_MAX = 0.55; // 自機狙いの割合
 var DIFF_NEW_START = 0.12, DIFF_NEW_GAIN = 0.16;     // 新敵の割合 12% → 28%
 
+// ---- ボス「ペルマフロスト」 ----
+// 時間制で登場する要塞ボス。本体（八角形）＋左右の大型砲塔2機。
+// 登場スケジュール、段階ごとの攻撃、処刑フェイズの数値をここに集約する。
+var BOSS_FIRST_TIME = 90;        // 初回登場（秒）。予告はこの3秒前から
+var BOSS_INTERVAL = 120;         // 撃破後、次の登場までの間隔（秒）
+var BOSS_WARN_TIME = 3;          // WARNING予告の長さ（秒）
+var BOSS_BODY_R = 64;            // 本体の半径
+var BOSS_TURRET_R = 34;          // 砲塔の半径
+var BOSS_TURRET_OFFSET = 104;    // 本体中心から砲塔中心までの距離
+var BOSS_CORE_HP = 60;           // 本体HP（第2段階で露出してから）
+var BOSS_TURRET_HP = 30;         // 砲塔HP（各）
+var BOSS_EXEC_HP = 90;           // 処刑フェイズの裏HP
+var BOSS_HP_MUL = 1.25;          // 2回目以降、登場ごとにHPがこの倍率で増える
+var BOSS_SPEED = 54;             // 第1段階の移動速度
+var BOSS_SPEED_P2 = 78;          // 第2段階は少し速くなる
+var BOSS_KEEP_DIST = 380;        // 自機と保つ間合い
+var BOSS_TURRET_FIRE_INTERVAL = 0.14; // 砲塔の拡散弾の発射間隔（秒）
+var BOSS_TURRET_BULLET_SPEED = 170;   // 砲塔の弾速
+var BOSS_TURRET_SWING_AMP = 0.7;      // 砲身スイングの振れ幅（rad、約±40°）
+var BOSS_TURRET_SWING_PERIOD = 2.4;   // スイングの周期（秒）。左右で位相をずらす
+var BOSS_ICE_INTERVAL = 4.5;     // 氷結弾の間隔（秒、遅め）
+var BOSS_ICE_MIN_INTERVAL = 3.2; // 登場回数で短くなる下限（秒）
+var BOSS_ICE_SPEED = 330;        // 氷結弾の飛翔速度
+var BOSS_ICE_DMG = 10;           // 氷結弾の直撃ダメージ
+var BOSS_SUMMON_INTERVAL = 12;   // ダーター召喚の間隔（秒）
+var BOSS_SUMMON_FIRST = 6;       // 登場後の初回召喚までの時間（秒）
+var BOSS_SUMMON_COUNT = 5;       // 1回の召喚数
+var BOSS_SUMMON_ALIVE_MAX = 2;   // 召喚ダーターがこの数以下なら召喚する
+var BOSS_SPIRAL_INTERVAL = 0.12; // 第2段階の回転弾幕の発射間隔（秒）
+var BOSS_SPIRAL_SPEED = 215;     // 回転弾幕の弾速（威力は拡散弾と同じ-5）
+var BOSS_CHARGE_TELEGRAPH = 0.8; // 突進予告の長さ（秒）
+var BOSS_CHARGE_SPEED = 285;     // 低速突進の速度
+var BOSS_CHARGE_TIME = 0.85;     // 突進の持続（秒）
+var BOSS_CHARGE_COOLDOWN = 3.4;  // 突進の間隔（秒）
+var BOSS_SCORE_TURRET = 1000;    // 砲塔破壊のスコア
+var BOSS_SCORE_FINAL = 5000;     // 処刑完了（大爆発）のスコア
+var BOSS_HEAL = 20;              // 撃破報酬：自機HP回復量
+var BOSS_EXEC_LIMIT = 12;        // 処刑フェイズでODタイマーを止める上限（秒）
+var BOSS_QUIET_TIME = 3.5;       // 撃破後の静けさ（通常湧き再開まで、秒）
+
 // ---- 演出の数値（衝撃波リング・シェイク） ----
 var RING_BASE_SPEED = 2600, RING_SPEED_PER_TIER = 800;  // 耐久1で2600、耐久3で3400
 var RING_BASE_WIDTH = 25, RING_WIDTH_PER_TIER = 10;     // 耐久1で太さ25、耐久3で35
