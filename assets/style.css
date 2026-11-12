@@ -1,0 +1,301 @@
+:root {
+  --bg: #04060f;
+  --panel: rgba(8, 14, 32, 0.82);
+  --cyan: #22e6ff;
+  --cyan-dim: #0e7d94;
+  --magenta: #ff2d78;
+  --text: #e8f6ff;
+  --text-dim: #8fb4c9;
+  --danger: #ff4040;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+  overscroll-behavior: none;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+body {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100dvh;
+  background:
+    radial-gradient(120% 70% at 50% 0%, #0a1230 0%, var(--bg) 55%);
+}
+
+/* ---------- stage（横画面 16:9） ---------- */
+#stage {
+  position: relative;
+  width: min(100vw, calc(100dvh * 16 / 9));
+  height: min(100dvh, calc(100vw * 9 / 16));
+  overflow: hidden;
+  background: #050914;
+  box-shadow: 0 0 0 1px rgba(34, 230, 255, 0.28), 0 0 42px rgba(34, 230, 255, 0.14), 0 0 120px rgba(255, 45, 120, 0.07);
+  touch-action: none;
+}
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+/* vignette + scanline feel */
+#stage::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(115% 90% at 50% 45%, transparent 62%, rgba(0, 0, 10, 0.5) 100%);
+}
+#stage.lowhp::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 60px rgba(255, 40, 40, 0.45);
+  animation: lowhpPulse 0.9s ease-in-out infinite;
+}
+@keyframes lowhpPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.85; } }
+@media (prefers-reduced-motion: reduce) {
+  #stage.lowhp::before { animation: none; opacity: 0.5; }
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding: calc(8px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left));
+  pointer-events: none;
+}
+#hud .row {
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.hud-block { line-height: 1.1; }
+.hud-label {
+  font-family: Orbitron, monospace; font-size: 9px; letter-spacing: 0.22em;
+  color: var(--text-dim);
+}
+.hud-value {
+  font-family: Orbitron, monospace; font-weight: 700; font-size: 21px;
+  color: var(--text); text-shadow: 0 0 10px rgba(34, 230, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+#hud-best .hud-value { font-size: 14px; color: var(--text-dim); text-shadow: none; padding-top: 4px; }
+#hud-time { margin-left: auto; text-align: right; }
+#hud-time .hud-value { font-size: 14px; padding-top: 4px; }
+/* ボタンだけはタイトル等のオーバーレイより前面に出す（HUD本体は背面のまま） */
+.hud-btns { display: flex; gap: 6px; pointer-events: auto; position: relative; z-index: 20; }
+.icon-btn {
+  width: 40px; height: 40px; min-height: 40px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 16, 36, 0.6); color: var(--cyan);
+  border: 1px solid rgba(34, 230, 255, 0.35); border-radius: 4px;
+  cursor: pointer;
+}
+.icon-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn:active { background: rgba(34, 230, 255, 0.18); }
+
+/* HP＋OVERDRIVE 統合バー：1つのフレームの中に
+   上段＝HP（太）、下段＝オーバードライブ（細い金のライン）を収め、
+   ラベルも1行に集約して HUD をすっきり見せる */
+#core-wrap {
+  margin-top: 8px; width: min(340px, 38vw);
+  padding: 7px 10px 8px;
+  background: linear-gradient(115deg, rgba(10, 22, 46, 0.88), rgba(5, 9, 22, 0.66));
+  border: 1px solid rgba(34, 230, 255, 0.38);
+  border-left: 3px solid var(--cyan);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  box-shadow: inset 0 0 18px rgba(34, 230, 255, 0.05);
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+#core-head {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  font-family: Orbitron, monospace; font-size: 9px; letter-spacing: 0.2em; color: var(--text-dim);
+  white-space: nowrap;
+}
+#core-head .core-od { color: #c9a86a; text-align: right; }
+#hp-num { font-size: 12px; color: var(--text); letter-spacing: 0.04em; margin-left: 3px; }
+#od-num { font-size: 11px; color: #ffe9a8; letter-spacing: 0.04em; margin-left: 3px; }
+#core-bar {
+  position: relative; margin-top: 5px; height: 14px; overflow: hidden;
+  background: rgba(2, 6, 16, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+}
+/* セグメントの刻み（上から薄く重ねる装飾） */
+#core-bar::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 31px, rgba(3, 6, 15, 0.55) 31px 33px);
+}
+#hp-fill {
+  position: absolute; left: 0; top: 0; z-index: 1;
+  height: 9px; width: 100%;
+  background: linear-gradient(90deg, #0e7d94, var(--cyan));
+  box-shadow: 0 0 12px rgba(34, 230, 255, 0.7);
+  transition: width 0.18s ease-out, background 0.3s;
+}
+#hp-fill.mid { background: linear-gradient(90deg, #b97a06, #ffc233); box-shadow: 0 0 12px rgba(255, 194, 51, 0.7); }
+#hp-fill.low { background: linear-gradient(90deg, #a11212, #ff4040); box-shadow: 0 0 12px rgba(255, 64, 64, 0.8); }
+#od-fill {
+  position: absolute; left: 0; bottom: 0; z-index: 2;
+  height: 4px; width: 0%;
+  border-top: 1px solid rgba(2, 6, 16, 0.8);
+  background: linear-gradient(90deg, #8a5f06, #ffc233, #ffe9a8);
+  box-shadow: 0 0 10px rgba(255, 194, 51, 0.6);
+  transition: width 0.15s ease-out;
+}
+/* 満タンが近づくとバー全体が明滅して知らせる */
+#core-wrap.nearfull #core-bar { animation: odBlink 0.55s ease-in-out infinite; }
+/* 発動中はフレームごと金色に光り、下段ラインが残り時間として減っていく */
+#core-wrap.active {
+  border-color: rgba(255, 194, 51, 0.8);
+  border-left-color: #ffc233;
+  box-shadow: 0 0 18px rgba(255, 194, 51, 0.28), inset 0 0 18px rgba(255, 194, 51, 0.14);
+}
+#core-wrap.active #od-fill {
+  background: linear-gradient(90deg, #ffc233, #fff0b3);
+  box-shadow: 0 0 16px rgba(255, 194, 51, 0.95);
+}
+#core-wrap.active .core-od, #core-wrap.active #od-num { color: #ffd968; }
+@keyframes odBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* 発動中だけ画面の縁を金色に光らせる層 */
+#od-glow {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  box-shadow: inset 0 0 72px rgba(255, 194, 51, 0.5), inset 0 0 20px rgba(255, 194, 51, 0.65);
+  opacity: 0; transition: opacity 0.25s ease-out;
+}
+#od-glow.on { opacity: 1; animation: odEdgePulse 0.9s ease-in-out infinite; }
+@keyframes odEdgePulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #core-wrap.nearfull #core-bar, #od-glow.on { animation: none; }
+}
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: absolute; inset: 0; z-index: 10;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 18px 26px;
+  background: var(--panel);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+.overlay[hidden] { display: none; }
+.game-title {
+  font-family: Orbitron, monospace; font-weight: 900;
+  font-size: clamp(30px, 6.5vw, 48px); letter-spacing: 0.06em; line-height: 1.05;
+  color: var(--text);
+  text-shadow: 0 0 18px rgba(34, 230, 255, 0.8), 0 0 46px rgba(34, 230, 255, 0.35);
+  margin: 0;
+}
+.game-title .accent { color: var(--magenta); text-shadow: 0 0 18px rgba(255, 45, 120, 0.8), 0 0 46px rgba(255, 45, 120, 0.35); }
+.tagline { margin: 10px 0 0; font-size: 13px; color: var(--text-dim); letter-spacing: 0.14em; }
+.rotate-note {
+  display: none; margin: 10px 0 0; font-size: 12px; color: #ffc233; letter-spacing: 0.08em;
+}
+@media (orientation: portrait) {
+  .rotate-note { display: block; }
+}
+.howto {
+  margin: 18px 0 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 7px;
+  font-size: 13.5px; line-height: 1.5; color: var(--text);
+  text-align: left;
+}
+.howto .k {
+  display: inline-block; min-width: 6.5em; margin-right: 8px;
+  font-family: Orbitron, monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--cyan);
+  text-align: right;
+}
+.enemy-legend {
+  margin-top: 16px; display: flex; gap: 12px 18px; justify-content: center;
+  flex-wrap: wrap; max-width: 780px;
+  font-size: 11px; color: var(--text-dim);
+}
+.enemy-legend figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.enemy-legend svg { width: 26px; height: 26px; overflow: visible; }
+.big-btn {
+  margin-top: 22px;
+  min-height: 50px; padding: 0 44px;
+  font-family: Orbitron, monospace; font-weight: 700; font-size: 16px; letter-spacing: 0.24em;
+  color: #031018; background: var(--cyan);
+  border: none; border-radius: 3px; cursor: pointer;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+  box-shadow: 0 0 24px rgba(34, 230, 255, 0.55);
+}
+.big-btn:active { transform: scale(0.97); }
+/* STARTと全画面ボタンの並び（タイトル画面） */
+.btn-row {
+  margin-top: 22px;
+  display: flex; gap: 12px; align-items: stretch; justify-content: center; flex-wrap: wrap;
+}
+.btn-row .big-btn { margin-top: 0; }
+/* 全画面ボタン：アイコンだけでなく文字でも示し、タイトル画面から直接押せるようにする */
+.sub-btn {
+  min-height: 50px; padding: 0 22px;
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: Orbitron, monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.14em;
+  color: var(--cyan); background: rgba(8, 16, 36, 0.55);
+  border: 1px solid rgba(34, 230, 255, 0.55); border-radius: 3px; cursor: pointer;
+}
+.sub-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.sub-btn:active { background: rgba(34, 230, 255, 0.18); }
+.over-title {
+  font-family: Orbitron, monospace; font-weight: 900; font-size: clamp(28px, 6vw, 42px);
+  letter-spacing: 0.08em; color: #ff5d5d; margin: 0;
+  text-shadow: 0 0 18px rgba(255, 64, 64, 0.75), 0 0 44px rgba(255, 64, 64, 0.3);
+}
+.result-grid {
+  margin-top: 20px; display: grid; grid-template-columns: auto auto; gap: 6px 26px;
+  font-family: Orbitron, monospace;
+}
+.result-grid dt { font-size: 10px; letter-spacing: 0.22em; color: var(--text-dim); text-align: right; align-self: center; }
+.result-grid dd { margin: 0; font-size: 24px; font-weight: 700; text-align: left; font-variant-numeric: tabular-nums; }
+.result-grid dd.small { font-size: 17px; color: var(--text-dim); }
+.new-record {
+  margin-top: 12px; font-family: Orbitron, monospace; font-size: 12px; letter-spacing: 0.3em;
+  color: #ffc233; text-shadow: 0 0 12px rgba(255, 194, 51, 0.8);
+}
+.new-record[hidden] { display: none; }
+.pause-title {
+  font-family: Orbitron, monospace; font-weight: 700; font-size: 26px; letter-spacing: 0.3em; margin: 0;
+  color: var(--text); text-shadow: 0 0 14px rgba(34, 230, 255, 0.6);
+}
+/* 背の低い画面（横向きスマホ等）では説明を詰めて収める。
+   縦持ちスマホは画面自体が高くてもステージは横長で背が低いため、
+   ビューポートの高さではなく向き＋幅でも判定する。中央寄せのまま
+   はみ出すと上側が見切れて届かなくなるので、上端から並べる。 */
+@media (max-height: 500px), (orientation: portrait) and (max-width: 900px) {
+  .overlay { padding: 10px 18px; justify-content: flex-start; }
+  .game-title { font-size: 24px; }
+  .tagline { margin-top: 4px; font-size: 11px; }
+  .rotate-note { margin-top: 4px; font-size: 11px; }
+  .howto { margin-top: 8px; gap: 3px; font-size: 11.5px; }
+  .enemy-legend { margin-top: 8px; }
+  .enemy-legend svg { width: 18px; height: 18px; }
+  .big-btn { margin-top: 10px; min-height: 42px; font-size: 14px; }
+  .btn-row { margin-top: 10px; }
+  .sub-btn { min-height: 42px; font-size: 12px; padding: 0 16px; }
+  .result-grid { margin-top: 10px; }
+}
+/* 縦持ちではステージの高さが画面幅の9/16（幅360pxなら約200px）
+   しかなく、通常レイアウトでは説明文が縦に積み上がって
+   START／全画面ボタンがステージ下端からはみ出し見切れてしまう。
+   HUDボタン列（上端から約44px）と重ならない上余白を確保した上で、
+   ほかを詰めてボタン列までをステージ内に収める。 */
+@media (orientation: portrait) and (max-width: 900px) {
+  .enemy-legend { display: none; }
+  .tagline { display: none; }
+  .overlay { padding: 46px 12px 8px; }
+  .game-title { font-size: 21px; }
+  .rotate-note { margin-top: 3px; font-size: 10.5px; }
+  .howto { margin-top: 6px; gap: 1px; font-size: 10.5px; line-height: 1.3; }
+  .howto .k { min-width: 5.4em; margin-right: 5px; font-size: 8.5px; }
+  .howto .pc-row { display: none; }
+  .howto .weapon-row { display: none; }
+  .howto .od-row { display: none; }
+  .icon-btn { width: 36px; height: 36px; min-height: 36px; }
+  .btn-row { margin-top: 8px; gap: 8px; flex-wrap: nowrap; }
+  .big-btn { min-height: 36px; font-size: 13px; padding: 0 24px; }
+  .sub-btn { min-height: 36px; font-size: 11px; padding: 0 12px; white-space: nowrap; }
+  .over-title { font-size: 26px; }
+  .result-grid { margin-top: 8px; gap: 3px 20px; }
+  .result-grid dd { font-size: 20px; }
+  .result-grid dd.small { font-size: 15px; }
+}
+/* 幅の狭い縦持ちでは GOAL の行も畳み、操作説明2行と
+   ボタン列がステージ内に収まることを優先する */
+@media (orientation: portrait) and (max-width: 480px) {
+  .howto .goal-row { display: none; }
+}
