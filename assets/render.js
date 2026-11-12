@@ -109,6 +109,26 @@ function draw() {
     ctx.restore();
   }
 
+  // ボス本体と砲塔
+  if (boss) drawBoss();
+
+  // 氷結弾（ボス第1段階）：飛行中の氷弾と、着弾点のマーカー
+  for (i = 0; i < iceShots.length; i++) {
+    var ish = iceShots[i];
+    var ik = Math.min(ish.t / ish.dur, 1);
+    ctx.save();
+    ctx.strokeStyle = "rgba(190, 240, 255, 0.6)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath(); ctx.arc(ish.tx, ish.ty, 56 - 34 * ik, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(127, 216, 255, 0.35)";
+    ctx.beginPath(); ctx.arc(ish.x, ish.y, 12, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#eaf9ff";
+    ctx.beginPath(); ctx.arc(ish.x, ish.y, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
   // 敵弾（事前描画スプライトを貼るだけ）
   for (i = 0; i < enemyBullets.length; i++) {
     var eb = enemyBullets[i];
@@ -203,6 +223,45 @@ function draw() {
 
   ctx.restore();
 
+  // ボスが画面外にいる時は、画面端に方向矢印で居場所を示す
+  if (boss && (state === "playing" || state === "paused")) {
+    var bsx = boss.x - camX + VIEW_W / 2, bsy = boss.y - camY + VIEW_H / 2;
+    if (bsx < -70 || bsx > VIEW_W + 70 || bsy < -70 || bsy > VIEW_H + 70) {
+      var bang = Math.atan2(boss.y - camY, boss.x - camX);
+      var ax = clamp(bsx, 30, VIEW_W - 30), ay = clamp(bsy, 30, VIEW_H - 30);
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(bang);
+      ctx.globalAlpha = 0.65 + 0.35 * Math.sin(performance.now() / 180);
+      ctx.fillStyle = "#7fd8ff";
+      ctx.beginPath();
+      ctx.moveTo(15, 0); ctx.lineTo(-9, -9); ctx.lineTo(-4, 0); ctx.lineTo(-9, 9);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // WARNING予告（ボス登場の約3秒前）：画面中央に警告表示
+  if (bossWarnT > 0 && state === "playing") {
+    var wblink = Math.floor(performance.now() / 320) % 2 === 0;
+    ctx.save();
+    ctx.fillStyle = "rgba(255, 40, 40, 0.13)";
+    ctx.fillRect(0, 0, VIEW_W, 30);
+    ctx.fillRect(0, VIEW_H - 30, VIEW_W, 30);
+    ctx.globalAlpha = wblink ? 1 : 0.45;
+    ctx.textAlign = "center";
+    ctx.font = "900 46px Orbitron, monospace";
+    ctx.fillStyle = "#ff4040";
+    ctx.shadowColor = "#ff4040";
+    ctx.shadowBlur = 18;
+    ctx.fillText("WARNING", VIEW_W / 2, VIEW_H / 2 - 6);
+    ctx.shadowBlur = 0;
+    ctx.font = "700 14px Orbitron, monospace";
+    ctx.fillStyle = "#ffb0a8";
+    ctx.fillText("PERMAFROST APPROACHING", VIEW_W / 2, VIEW_H / 2 + 24);
+    ctx.restore();
+  }
+
   // コンボ表示（画面固定）：伸びるほど色が熱くなり、出た瞬間は弾む。
   // スコア倍率は付けず、表示と効果音の音程だけが変わる。
   if (comboCount >= 2 && comboTimer > 0 && (state === "playing" || state === "paused")) {
@@ -252,12 +311,150 @@ function drawMinimap() {
     var ds = enemies[i].type === "tank" ? 4 : 2;
     ctx.fillRect(mx + enemies[i].x * sx - ds / 2, my + enemies[i].y * sy - ds / 2, ds, ds);
   }
+  // ボス（大きな点）
+  if (boss) {
+    ctx.fillStyle = boss.phase === 2 ? "#ff8a7a" : "#bfefff";
+    ctx.fillRect(mx + boss.x * sx - 3, my + boss.y * sy - 3, 6, 6);
+  }
   // 自機
   ctx.fillStyle = "#22e6ff";
   ctx.beginPath();
   ctx.arc(mx + player.x * sx, my + player.y * sy, 3, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+// ボス「ペルマフロスト」の描画：左右の砲塔→本体（八角形）→バリアの順。
+// 処刑フェイズの残骸は暗く点滅し、撃たれた直後は震える。
+function drawBoss() {
+  var b = boss;
+  var exec = b.phase === "exec";
+  var ox = 0, oy = 0;
+  if (b.shakeT > 0) { ox = rand(-3.5, 3.5); oy = rand(-3.5, 3.5); }
+  var flicker = exec && Math.floor(performance.now() / 130) % 3 === 0;
+  var i, tr;
+
+  // 第2段階の突進予告：進行方向（自機）へ赤い破線
+  if (b.phase === 2 && b.chargeState === "tele") {
+    var ta = Math.atan2(player.y - b.y, player.x - b.x);
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 64, 64, 0.55)";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 8]);
+    ctx.beginPath();
+    ctx.moveTo(b.x, b.y);
+    ctx.lineTo(b.x + Math.cos(ta) * 340, b.y + Math.sin(ta) * 340);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 砲塔（生きているものだけ）。砲身はスイング中の照準方向を向く
+  for (i = 0; i < b.turrets.length; i++) {
+    tr = b.turrets[i];
+    if (!tr.alive) continue;
+    ctx.save();
+    ctx.translate(tr.x + ox, tr.y + oy);
+    ctx.shadowColor = "#7fd8ff";
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = tr.flash > 0 ? "#ffffff" : "#7fd8ff";
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(0, 0, BOSS_TURRET_R, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(127, 216, 255, 0.16)";
+    ctx.beginPath(); ctx.arc(0, 0, BOSS_TURRET_R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(191, 239, 255, 0.6)";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, BOSS_TURRET_R * 0.55, 0, Math.PI * 2); ctx.stroke();
+    // 砲身
+    ctx.rotate(tr.aim);
+    ctx.fillStyle = tr.flash > 0 ? "#ffffff" : "#bfefff";
+    ctx.fillRect(6, -5, BOSS_TURRET_R + 14, 10);
+    ctx.restore();
+    ctx.fillStyle = "#eaf9ff";
+    ctx.beginPath(); ctx.arc(tr.x + ox, tr.y + oy, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // 本体：大型の八角形の氷の要塞
+  ctx.save();
+  ctx.translate(b.x + ox, b.y + oy);
+  ctx.rotate(b.rot);
+  if (flicker) ctx.globalAlpha = 0.45;
+  var bodyPts = shapePoints({ shape: "octagon", r: b.r, rot: 0 });
+  ctx.shadowColor = "#7fd8ff";
+  ctx.shadowBlur = exec ? 0 : 18;
+  ctx.strokeStyle = b.flash > 0 ? "#ffffff" : (exec ? "#5d7d94" : "#7fd8ff");
+  ctx.lineWidth = 3.5;
+  pathOn(ctx, bodyPts);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = exec ? "rgba(127, 216, 255, 0.06)" : "rgba(127, 216, 255, 0.16)";
+  pathOn(ctx, bodyPts);
+  ctx.fill();
+  // 内側の八角形
+  ctx.strokeStyle = exec ? "rgba(120, 160, 190, 0.4)" : "rgba(191, 239, 255, 0.5)";
+  ctx.lineWidth = 2;
+  pathOn(ctx, shapePoints({ shape: "octagon", r: b.r * 0.68, rot: 0 }));
+  ctx.stroke();
+  ctx.restore();
+
+  // コア（回転しない中心の光）。第2段階では赤く点滅し、処刑中は弱く明滅
+  ctx.save();
+  ctx.translate(b.x + ox, b.y + oy);
+  if (exec) {
+    ctx.fillStyle = Math.floor(performance.now() / 200) % 2 === 0 ? "#7a4a3a" : "#4a3430";
+    ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
+    // ひび割れ
+    ctx.strokeStyle = "rgba(10, 16, 26, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-40, -18); ctx.lineTo(-12, -4); ctx.lineTo(-20, 22);
+    ctx.moveTo(34, -30); ctx.lineTo(10, -6); ctx.lineTo(26, 18);
+    ctx.moveTo(-6, 40); ctx.lineTo(2, 12);
+    ctx.stroke();
+  } else if (b.phase === 2) {
+    var coreR = 13 + Math.sin(b.t * 9) * 2.5;
+    ctx.fillStyle = Math.sin(b.t * 9) > 0 ? "#ff5040" : "#ffb03a";
+    ctx.shadowColor = "#ff5040";
+    ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(0, 0, coreR, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff0d8";
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+  } else {
+    var coreR2 = 12 + Math.sin(b.t * 3.2) * 2;
+    ctx.fillStyle = "#bfefff";
+    ctx.shadowColor = "#7fd8ff";
+    ctx.shadowBlur = 16;
+    ctx.beginPath(); ctx.arc(0, 0, coreR2, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore();
+
+  // バリア（第1段階のみ）：本体を覆う氷の殻。当たった直後は強く光る
+  if (b.phase === 1) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    var ba = 0.4 + 0.14 * Math.sin(b.t * 3) + (b.shieldFlash > 0 ? 0.45 : 0);
+    ctx.strokeStyle = "rgba(170, 228, 255, " + Math.min(ba, 0.9) + ")";
+    ctx.lineWidth = b.shieldFlash > 0 ? 4 : 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, b.r + 17, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = "rgba(170, 228, 255, " + Math.min(ba * 0.6, 0.6) + ")";
+    ctx.lineWidth = 5;
+    ctx.setLineDash([30, 20]);
+    ctx.lineDashOffset = -b.t * 34;
+    ctx.beginPath(); ctx.arc(0, 0, b.r + 17, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  // 処刑フェイズの残り裏HP（残骸の上に小さな金バー）
+  if (exec) {
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.fillRect(b.x - 44, b.y - b.r - 16, 88, 4);
+    ctx.fillStyle = "#ffc233";
+    ctx.fillRect(b.x - 44, b.y - b.r - 16, 88 * Math.max(b.execHp, 0) / b.execMax, 4);
+  }
 }
 
 function drawStick(st, color) {

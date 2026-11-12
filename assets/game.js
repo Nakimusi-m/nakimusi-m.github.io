@@ -95,6 +95,8 @@ function spawnPointFar(minDist, others) {
 // ---- 生成ディレクター：時間経過で少しずつ激しくなる ----
 var director = { timer: 0.6 };
 function directorUpdate(dt) {
+  // ボス予告中・ボス戦中・撃破後の静けさの間は通常湧きを止める
+  if (bossWarnT > 0 || boss || quietTimer > 0) { director.timer = 0.5; return; }
   director.timer -= dt;
   if (director.timer > 0) return;
   director.timer = diff.spawnInterval * rand(0.75, 1.25);
@@ -173,6 +175,19 @@ var odActive = false; // 発動中かどうか
 var odTimer = 0;      // 発動中の残り時間（秒）
 var comboCount = 0, comboTimer = 0, comboPop = 0;
 var COMBO_WINDOW = 2.2; // この秒数以内に倒し続けるとコンボが伸びる
+// ---- ボス「ペルマフロスト」用ステート ----
+var boss = null;              // 戦闘中のボス本体オブジェクト（いなければ null）
+var bossWarnT = 0;            // WARNING予告の残り時間（秒）
+var bossNextTime = BOSS_FIRST_TIME; // 次にボスが登場する経過時間（秒）
+var bossSpawnCount = 0;       // 登場回数（HP倍率・氷結弾間隔の計算に使う）
+var bossKills = 0;            // 撃破数（撃破ごとに難易度が1段上がる）
+var quietTimer = 0;           // 撃破後の静けさの残り時間（秒）
+var odFrozen = false;         // 処刑中はオーバードライブのタイマーを止める
+var iceShots = [];            // 飛行中の氷結弾 {x,y,tx,ty,t,dur}
+var warnSfxT = 0;             // 警報音の間引きタイマ
+var bossBarShatterT = 0;      // ボスバーの「砕ける」演出の残り時間
+// ボス戦中（処刑フェイズを除く）はオーバードライブゲージが一切貯まらない
+function bossGaugeLocked() { return !!(boss && boss.phase !== "exec"); }
 // ---- 演出オブジェクトの上限と再利用プール（軽量化） ----
 // 同時発生数を絞り、使い終わったオブジェクトはプールへ戻して
 // 使い回すことで、激しい場面でも確保・GCの負荷を一定に保つ。
@@ -188,6 +203,11 @@ function computeDiff() {
     aimedProb: Math.min(elapsed / DIFF_AIMED_RAMP_TIME, 1) * DIFF_AIMED_MAX, // 自機狙いの割合増
     newProb: DIFF_NEW_START + DIFF_NEW_GAIN * k         // 新敵の割合 12% → 28%（既存3種が主役のまま時々混ざる）
   };
+  // ボスを倒すたびに難易度が1段上がる（出現が速く、敵も速くなる）
+  if (bossKills > 0) {
+    diff.spawnInterval *= Math.pow(0.93, bossKills);
+    diff.speedMul += 0.07 * bossKills;
+  }
 }
 
 function resetGame() {
@@ -204,6 +224,9 @@ function resetGame() {
   comboCount = 0; comboTimer = 0; comboPop = 0;
   hitStop = 0; gridPulse = 0;
   odGauge = 0; odActive = false; odTimer = 0;
+  boss = null; bossWarnT = 0; bossNextTime = BOSS_FIRST_TIME;
+  bossSpawnCount = 0; bossKills = 0; quietTimer = 0;
+  odFrozen = false; iceShots = []; warnSfxT = 0; bossBarShatterT = 0;
   score = 0; elapsed = 0; shake = 0;
   director.timer = 0.6;
   leftStick.active = false; rightStick.active = false;
@@ -226,6 +249,362 @@ function spawnEnemyBullet(x, y, dx, dy, speed, dmg) {
   enemyBullets.push({ x: x, y: y, vx: dx * speed, vy: dy * speed, r: 4.5, dmg: dmg || ENEMY_BULLET_DMG });
   sfxEnemyShoot();
 }
+// ボスの弾は連射が激しいため、発射音なしで直接積む
+function spawnBossBullet(x, y, angle, speed, dmg) {
+  enemyBullets.push({ x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 4.5, dmg: dmg });
+}
+
+/* ============================================================
+   ボス「ペルマフロスト」
+   本体（八角形の氷の要塞）＋左右の大型砲塔2機の複合ボス。
+   第1段階：砲塔がスイング拡散弾、本体はバリア無敵で氷結弾。
+   第2段階：砲塔を両方壊すとバリアが割れ、回転弾幕＋低速突進。
+   本体を倒し切ると処刑フェイズ（機能停止した残骸をODで撃ち込む）。
+   数値はすべて config.js の BOSS_* を参照する。
+   ============================================================ */
+// 登場スケジュール：予告→出現を管理する
+function bossDirector(dt) {
+  if (quietTimer > 0) quietTimer -= dt;
+  if (!boss && bossWarnT <= 0 && quietTimer <= 0 && elapsed >= bossNextTime - BOSS_WARN_TIME) {
+    bossWarnT = BOSS_WARN_TIME;
+    warnSfxT = 0;
+  }
+  if (bossWarnT > 0) {
+    warnSfxT -= dt;
+    if (warnSfxT <= 0) { warnSfxT = 0.65; sfxWarning(); }
+    bossWarnT -= dt;
+    if (bossWarnT <= 0) { bossWarnT = 0; spawnBoss(); }
+  }
+}
+
+function spawnBoss() {
+  bossSpawnCount++;
+  var mul = Math.pow(BOSS_HP_MUL, bossSpawnCount - 1);
+  var p = spawnPoint();
+  var turretMax = Math.round(BOSS_TURRET_HP * mul);
+  var coreMax = Math.round(BOSS_CORE_HP * mul);
+  boss = {
+    x: clamp(p.x, 110, WORLD_W - 110), y: clamp(p.y, 110, WORLD_H - 110),
+    r: BOSS_BODY_R, t: 0, rot: rand(0, Math.PI * 2), faceAngle: 0,
+    phase: 1, // 1: 砲塔戦（バリア） / 2: 本体戦 / "exec": 処刑フェイズ
+    coreHp: coreMax, coreMax: coreMax,
+    execHp: 0, execMax: Math.round(BOSS_EXEC_HP * mul), execTimer: 0,
+    totalMax: coreMax + turretMax * 2,
+    turrets: [
+      { side: -1, hp: turretMax, maxHp: turretMax, alive: true, x: 0, y: 0, aim: 0, fireTimer: 0.5, swingPhase: 0, flash: 0 },
+      { side: 1, hp: turretMax, maxHp: turretMax, alive: true, x: 0, y: 0, aim: 0, fireTimer: 0.65, swingPhase: Math.PI, flash: 0 }
+    ],
+    iceTimer: 2.2,
+    iceInterval: Math.max(BOSS_ICE_MIN_INTERVAL, BOSS_ICE_INTERVAL * Math.pow(0.93, bossSpawnCount - 1)),
+    summonTimer: BOSS_SUMMON_FIRST,
+    spiralTimer: 0, spiralAngle: rand(0, Math.PI * 2),
+    chargeState: "idle", chargeTimer: 0, chargeCooldown: 2.2, chargeAngle: 0,
+    flash: 0, shieldFlash: 0, shakeT: 0, strafeDir: Math.random() < 0.5 ? -1 : 1, strafeT: rand(2, 4)
+  };
+  updateBossTurretPos();
+  // 登場の衝撃波：残っていた通常敵をすべて消滅させる（スコアは入らない）
+  for (var i = 0; i < enemies.length; i++) {
+    if (!enemies[i].dead) { burst(enemies[i].x, enemies[i].y, enemies[i].color, 8); enemies[i].dead = true; }
+  }
+  enemyBullets = [];
+  spawnRing(boss.x, boss.y, "#7fd8ff", 6);
+  burst(boss.x, boss.y, "#7fd8ff", 26);
+  shake = Math.max(shake, 20);
+  // ボス戦開始：オーバードライブを強制終了し、ゲージを0にする（正面勝負）
+  if (odActive) sfxOverdriveEnd();
+  odActive = false; odTimer = 0; odGauge = 0; odFrozen = false;
+  sfxExplosion(true);
+}
+
+// 砲塔の位置は本体の向き（自機方向）の左右に付ける
+function updateBossTurretPos() {
+  if (!boss) return;
+  var px = -Math.sin(boss.faceAngle), py = Math.cos(boss.faceAngle);
+  var fx = Math.cos(boss.faceAngle), fy = Math.sin(boss.faceAngle);
+  for (var i = 0; i < boss.turrets.length; i++) {
+    var tr = boss.turrets[i];
+    tr.x = boss.x + px * tr.side * BOSS_TURRET_OFFSET + fx * 8;
+    tr.y = boss.y + py * tr.side * BOSS_TURRET_OFFSET + fy * 8;
+  }
+}
+
+function bossUpdate(dt) {
+  if (!boss) return;
+  var b = boss;
+  b.t += dt;
+  b.rot += dt * 0.16;
+  if (b.flash > 0) b.flash -= dt;
+  if (b.shieldFlash > 0) b.shieldFlash -= dt;
+  if (b.shakeT > 0) b.shakeT -= dt;
+  for (var ti = 0; ti < b.turrets.length; ti++) if (b.turrets[ti].flash > 0) b.turrets[ti].flash -= dt;
+
+  // 処刑フェイズ：機能停止。動かず撃たず、ODタイマー停止の上限だけ数える
+  if (b.phase === "exec") {
+    b.execTimer += dt;
+    if (b.execTimer >= BOSS_EXEC_LIMIT && odFrozen) odFrozen = false; // 上限でタイマー再開
+    return;
+  }
+
+  var dx = player.x - b.x, dy = player.y - b.y;
+  var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  b.faceAngle = Math.atan2(dy, dx);
+  var frostMul = inFrost(b.x, b.y) ? FROST_SLOW : 1;
+
+  // ---- 移動：間合いを保って漂う。第2段階の突進中は専用の動き ----
+  var charging = false;
+  if (b.phase === 2) {
+    if (b.chargeState === "tele") {
+      b.chargeTimer -= dt;
+      if (b.chargeTimer <= 0) {
+        b.chargeState = "dash"; b.chargeTimer = BOSS_CHARGE_TIME;
+        b.chargeAngle = Math.atan2(player.y - b.y, player.x - b.x); // 予告の終わりに方向を固定
+      }
+    } else if (b.chargeState === "dash") {
+      charging = true;
+      b.x += Math.cos(b.chargeAngle) * BOSS_CHARGE_SPEED * frostMul * dt;
+      b.y += Math.sin(b.chargeAngle) * BOSS_CHARGE_SPEED * frostMul * dt;
+      b.chargeTimer -= dt;
+      if (b.chargeTimer <= 0) { b.chargeState = "recover"; b.chargeTimer = 1.0; }
+    } else if (b.chargeState === "recover") {
+      b.chargeTimer -= dt;
+      if (b.chargeTimer <= 0) { b.chargeState = "idle"; b.chargeCooldown = BOSS_CHARGE_COOLDOWN * rand(0.85, 1.2); }
+    } else {
+      b.chargeCooldown -= dt;
+      if (b.chargeCooldown <= 0 && dist < 560) { b.chargeState = "tele"; b.chargeTimer = BOSS_CHARGE_TELEGRAPH; }
+    }
+  }
+  if (!charging) {
+    var speed = (b.phase === 2 ? BOSS_SPEED_P2 : BOSS_SPEED) * frostMul;
+    if (b.chargeState === "tele" || b.chargeState === "recover") speed *= 0.25; // 予告・硬直中はほぼ止まる
+    b.strafeT -= dt;
+    if (b.strafeT <= 0) { b.strafeT = rand(2, 4); b.strafeDir *= -1; }
+    var radial = 0;
+    if (dist > BOSS_KEEP_DIST + 40) radial = 1;
+    else if (dist < BOSS_KEEP_DIST - 40) radial = -1;
+    var strafe = b.strafeDir * 0.45;
+    var ux = dx / dist, uy = dy / dist;
+    b.x += (ux * radial + -uy * strafe) * speed * dt;
+    b.y += (uy * radial + ux * strafe) * speed * dt;
+  }
+  b.x = clamp(b.x, 86, WORLD_W - 86);
+  b.y = clamp(b.y, 86, WORLD_H - 86);
+  updateBossTurretPos();
+
+  // ---- 砲塔：自機方向を中心にスイングしながら拡散弾を連射 ----
+  for (ti = 0; ti < b.turrets.length; ti++) {
+    var tr = b.turrets[ti];
+    if (!tr.alive) continue;
+    var base = Math.atan2(player.y - tr.y, player.x - tr.x);
+    tr.aim = base + Math.sin(b.t * Math.PI * 2 / BOSS_TURRET_SWING_PERIOD + tr.swingPhase) * BOSS_TURRET_SWING_AMP;
+    tr.fireTimer -= dt;
+    if (tr.fireTimer <= 0 && dist < ATTACK_RANGE + 160) {
+      tr.fireTimer = BOSS_TURRET_FIRE_INTERVAL;
+      for (var pk = -1; pk <= 1; pk++) {
+        spawnBossBullet(tr.x + Math.cos(tr.aim) * (BOSS_TURRET_R + 4), tr.y + Math.sin(tr.aim) * (BOSS_TURRET_R + 4),
+          tr.aim + pk * 0.13, BOSS_TURRET_BULLET_SPEED, SPREAD_DMG);
+      }
+    }
+  }
+
+  if (b.phase === 1) {
+    // ---- 本体・第1段階：遅い間隔で氷結弾（着弾点に凍結エリア） ----
+    b.iceTimer -= dt;
+    if (b.iceTimer <= 0) {
+      b.iceTimer = b.iceInterval;
+      var idist = Math.sqrt((player.x - b.x) * (player.x - b.x) + (player.y - b.y) * (player.y - b.y));
+      iceShots.push({ x: b.x, y: b.y, sx: b.x, sy: b.y, tx: player.x, ty: player.y, t: 0, dur: Math.max(idist / BOSS_ICE_SPEED, 0.25) });
+      tone(300, 700, 0.18, "sine", 0.04);
+    }
+  } else {
+    // ---- 本体・第2段階：回転弾幕（両方向へ渦状に撒く） ----
+    b.spiralTimer -= dt;
+    if (b.spiralTimer <= 0 && dist < ATTACK_RANGE + 160) {
+      b.spiralTimer = BOSS_SPIRAL_INTERVAL;
+      b.spiralAngle += SPIRAL_ANGLE_STEP;
+      spawnBossBullet(b.x, b.y, b.spiralAngle, BOSS_SPIRAL_SPEED, SPIRAL_DMG);
+      spawnBossBullet(b.x, b.y, b.spiralAngle + Math.PI, BOSS_SPIRAL_SPEED, SPIRAL_DMG);
+    }
+  }
+
+  // ---- ダーター召喚（両段階共通）：残りが少なければ5体を周囲へ ----
+  b.summonTimer -= dt;
+  if (b.summonTimer <= 0) {
+    b.summonTimer = BOSS_SUMMON_INTERVAL;
+    var aliveSummoned = 0;
+    for (var si = 0; si < enemies.length; si++) if (enemies[si].summoned && !enemies[si].dead) aliveSummoned++;
+    if (aliveSummoned <= BOSS_SUMMON_ALIVE_MAX) {
+      for (var sn = 0; sn < BOSS_SUMMON_COUNT; sn++) {
+        var sa = (sn / BOSS_SUMMON_COUNT) * Math.PI * 2 + rand(-0.3, 0.3);
+        var sx = clamp(b.x + Math.cos(sa) * 150, 30, WORLD_W - 30);
+        var sy = clamp(b.y + Math.sin(sa) * 150, 30, WORLD_H - 30);
+        var se = spawnEnemy("darter", sx, sy, Math.atan2(player.y - sy, player.x - sx) * 180 / Math.PI);
+        se.summoned = true; // ゲージはボス戦中ロックされるため対象外（スコアのみ）
+        burst(sx, sy, "#ff8c1a", 5);
+      }
+    }
+  }
+}
+
+// 氷結弾の飛行と着弾：着弾点に凍結エリア。飛行中に自機へ触れれば直撃-10
+function updateIceShots(dt) {
+  for (var i = iceShots.length - 1; i >= 0; i--) {
+    var s = iceShots[i];
+    s.t += dt;
+    var k = Math.min(s.t / s.dur, 1);
+    s.x = s.sx + (s.tx - s.sx) * k;
+    s.y = s.sy + (s.ty - s.sy) * k;
+    var pdx = player.x - s.x, pdy = player.y - s.y;
+    if (player.invincible <= 0 && pdx * pdx + pdy * pdy < (player.r + 11) * (player.r + 11)) {
+      damagePlayer(BOSS_ICE_DMG);
+      landIceShot(s);
+      iceShots.splice(i, 1);
+      continue;
+    }
+    if (k >= 1) { landIceShot(s); iceShots.splice(i, 1); }
+  }
+}
+function landIceShot(s) {
+  frostZones.push({ x: s.tx, y: s.ty, r: FROST_RADIUS, life: FROST_DURATION, maxLife: FROST_DURATION });
+  burst(s.tx, s.ty, "#7fd8ff", 16);
+  spawnRing(s.tx, s.ty, "#7fd8ff", 2);
+  sfxExplosion(false);
+}
+
+// 砲塔の破壊：スコアのみ（ゲージは増えない）。両方壊れると第2段階へ
+function destroyTurret(tr) {
+  tr.alive = false; tr.hp = 0;
+  score += BOSS_SCORE_TURRET;
+  burst(tr.x, tr.y, "#7fd8ff", 22);
+  spawnRing(tr.x, tr.y, "#7fd8ff", 4);
+  spawnSparks(tr.x, tr.y, "#d8f6ff", 9);
+  if (popups.length >= MAX_POPUPS) popups.shift();
+  popups.push({ x: tr.x, y: tr.y - 10, text: "+" + BOSS_SCORE_TURRET, life: 0.8, maxLife: 0.8, pop: 1, big: true, color: "#7fd8ff" });
+  shake = Math.max(shake, 16);
+  gridPulse = 1;
+  sfxExplosion(true);
+  if (boss && !boss.turrets[0].alive && !boss.turrets[1].alive && boss.phase === 1) {
+    // バリア崩壊 → 本体露出。第2段階の攻撃に切り替わる
+    boss.phase = 2;
+    boss.chargeState = "idle"; boss.chargeCooldown = 2.4;
+    boss.spiralTimer = 0.6;
+    spawnRing(boss.x, boss.y, "#bfefff", 6);
+    burst(boss.x, boss.y, "#bfefff", 24);
+    if (popups.length >= MAX_POPUPS) popups.shift();
+    popups.push({ x: boss.x, y: boss.y - 84, text: "BARRIER DOWN", life: 1.1, maxLife: 1.1, pop: 1, big: true, color: "#bfefff" });
+    sfxBarrierDown();
+  }
+}
+
+// 本体を倒し切った：処刑フェイズへ。ゲージ満タンでOD発動、タイマーは止まる
+function enterExecution() {
+  var b = boss;
+  b.phase = "exec";
+  b.execHp = b.execMax;
+  b.execTimer = 0;
+  enemyBullets = []; // 決着の瞬間に弾幕は消える
+  odGauge = 100;
+  if (!odActive) activateOverdrive(); else { odTimer = OD_DURATION; }
+  odFrozen = true;
+  bossBarShatterT = 0.6; // ボスバーは砕けて消える
+  var bossWrapEl = document.getElementById("boss-wrap");
+  if (bossWrapEl) bossWrapEl.className = "shatter";
+  hitStop = 0.09;
+  shake = Math.max(shake, 24);
+  spawnRing(b.x, b.y, "#ffc233", 6);
+  burst(b.x, b.y, "#7fd8ff", 30);
+  sfxExplosion(true);
+}
+
+// 処刑完了：大爆発＋5,000点＋HP20回復。静けさの後に通常戦が戻る
+function finishBoss() {
+  var b = boss;
+  score += BOSS_SCORE_FINAL;
+  player.hp = Math.min(player.maxHp, player.hp + BOSS_HEAL);
+  if (popups.length >= MAX_POPUPS) popups.shift();
+  popups.push({ x: b.x, y: b.y - 20, text: "+" + BOSS_SCORE_FINAL, life: 1.1, maxLife: 1.1, pop: 1, big: true, color: "#ffc233" });
+  if (popups.length >= MAX_POPUPS) popups.shift();
+  popups.push({ x: player.x, y: player.y - 26, text: "HP +" + BOSS_HEAL, life: 1.0, maxLife: 1.0, pop: 1, big: true, color: "#3dff7a" });
+  for (var i = 0; i < 3; i++) burst(b.x + rand(-40, 40), b.y + rand(-40, 40), i === 0 ? "#ffc233" : "#7fd8ff", 24);
+  spawnRing(b.x, b.y, "#ffc233", 6);
+  spawnRing(b.x, b.y, "#7fd8ff", 6);
+  spawnSparks(b.x, b.y, "#ffffff", 12);
+  shake = 34; hitStop = 0.1; gridPulse = 1;
+  sfxExplosion(true);
+  // 残っていた召喚ダーターも大爆発で消える（静けさを取り戻す）
+  for (var ci = 0; ci < enemies.length; ci++) {
+    if (enemies[ci].summoned && !enemies[ci].dead) { burst(enemies[ci].x, enemies[ci].y, enemies[ci].color, 6); enemies[ci].dead = true; }
+  }
+  boss = null;
+  bossKills++;
+  quietTimer = BOSS_QUIET_TIME;
+  bossNextTime = elapsed + BOSS_INTERVAL;
+  odFrozen = false; // 処刑後もODが残っていれば通常タイマーで継続する
+  updateHud();
+}
+
+// 自機の弾の線分と円の当たり判定（ボス各部用）。当たった点を返す
+function bulletSegHit(b, x, y, rr) {
+  var bx0 = b.px != null ? b.px : b.x, by0 = b.py != null ? b.py : b.y;
+  var segX = b.x - bx0, segY = b.y - by0;
+  var segLen2 = segX * segX + segY * segY;
+  var segT = segLen2 > 0 ? ((x - bx0) * segX + (y - by0) * segY) / segLen2 : 0;
+  segT = segT < 0 ? 0 : (segT > 1 ? 1 : segT);
+  var hitX = bx0 + segX * segT, hitY = by0 + segY * segT;
+  var dx = hitX - x, dy = hitY - y;
+  if (dx > rr || dx < -rr || dy > rr || dy < -rr) return null;
+  if (dx * dx + dy * dy < rr * rr) return { x: hitX, y: hitY };
+  return null;
+}
+
+// 当たり判定：自機の弾 × ボス（砲塔→本体の順）
+function bossBulletCollisions() {
+  if (!boss) return;
+  var b = boss;
+  for (var i = 0; i < bullets.length; i++) {
+    var bl = bullets[i];
+    if (bl.dead) continue;
+    var j, tr, hit;
+    // 砲塔（生きているものだけ）
+    for (j = 0; j < b.turrets.length; j++) {
+      tr = b.turrets[j];
+      if (!tr.alive) continue;
+      if (bl.pierce && bl.hitUids["tur" + j]) continue;
+      hit = bulletSegHit(bl, tr.x, tr.y, BOSS_TURRET_R + bl.r);
+      if (hit) {
+        if (bl.pierce) bl.hitUids["tur" + j] = true; else bl.dead = true;
+        tr.hp -= bl.dmg; tr.flash = 0.09;
+        spawnSparks(hit.x, hit.y, "#7fd8ff", 3);
+        if (tr.hp <= 0) destroyTurret(tr);
+        break;
+      }
+    }
+    if (bl.dead) continue;
+    // 本体（貫通弾は1発につき1回だけ当たる）
+    if (bl.pierce && bl.hitUids.bossBody) continue;
+    hit = bulletSegHit(bl, b.x, b.y, b.r + bl.r);
+    if (!hit) continue;
+    if (b.phase === 1) {
+      // バリア：どの弾も弾かれて消える（貫通弾も通らない）
+      bl.dead = true;
+      b.shieldFlash = 0.16;
+      spawnSparks(hit.x, hit.y, "#bfefff", 4);
+      continue;
+    }
+    if (bl.pierce) bl.hitUids.bossBody = true; else bl.dead = true;
+    b.flash = 0.09;
+    spawnSparks(hit.x, hit.y, b.phase === "exec" ? "#ffc233" : "#7fd8ff", 3);
+    if (b.phase === "exec") {
+      // サンドバッグ：撃たれるたびに震え、破片を落とす
+      b.execHp -= bl.dmg;
+      b.shakeT = 0.09;
+      if (Math.random() < 0.4) burst(hit.x, hit.y, "#7fd8ff", 2);
+      if (b.execHp <= 0) { finishBoss(); return; }
+    } else {
+      b.coreHp -= bl.dmg;
+      if (b.coreHp <= 0) { enterExecution(); }
+    }
+  }
+}
 
 /* ============================================================
    更新
@@ -235,7 +614,11 @@ function update(dt) {
 
   elapsed += dt;
   computeDiff();
+  bossDirector(dt);
   directorUpdate(dt);
+  bossUpdate(dt);
+  updateIceShots(dt);
+  if (bossBarShatterT > 0) bossBarShatterT -= dt;
 
   // 凍結エリアの寿命（残り時間を使い切ったら消える）
   for (var fi = frostZones.length - 1; fi >= 0; fi--) {
@@ -244,7 +627,8 @@ function update(dt) {
   }
 
   // オーバードライブの残り時間。尽きたら強化が終わり、ゲージは0へ。
-  if (odActive) {
+  // 処刑フェイズ中はタイマーを止める（上限つき。bossUpdate 側で解除）。
+  if (odActive && !odFrozen) {
     odTimer -= dt;
     if (odTimer <= 0) {
       odTimer = 0; odActive = false; odGauge = 0;
@@ -434,6 +818,9 @@ function update(dt) {
     }
   }
 
+  // 当たり判定：自機の弾 × ボス（砲塔・本体・バリア・処刑中の残骸）
+  bossBulletCollisions();
+
   // 当たり判定：自機 × 敵弾 / 敵本体
   if (player.invincible <= 0) {
     var damaged = false;
@@ -474,6 +861,20 @@ function update(dt) {
         }
       }
     }
+    // 自機 × ボス本体・砲塔（処刑中の残骸は無害で当たらない）
+    if (!damaged && boss && boss.phase !== "exec" && player.invincible <= 0) {
+      var bdx = boss.x - player.x, bdy = boss.y - player.y, brr = player.r + boss.r - 3;
+      if (bdx * bdx + bdy * bdy < brr * brr) {
+        damagePlayer(CONTACT_DMG);
+      } else {
+        for (var bti = 0; bti < boss.turrets.length; bti++) {
+          var btr = boss.turrets[bti];
+          if (!btr.alive) continue;
+          var tdx = btr.x - player.x, tdy = btr.y - player.y, trr = player.r + BOSS_TURRET_R - 3;
+          if (tdx * tdx + tdy * tdy < trr * trr) { damagePlayer(CONTACT_DMG); break; }
+        }
+      }
+    }
   }
 
   // dead フラグの付いた要素を一括除去する。要素が多い時に
@@ -502,7 +903,10 @@ var el = {
   odFill: document.getElementById("od-fill"),
   odNum: document.getElementById("od-num"),
   odWrap: document.getElementById("core-wrap"),
-  odGlow: document.getElementById("od-glow")
+  odGlow: document.getElementById("od-glow"),
+  bossWrap: document.getElementById("boss-wrap"),
+  bossFill: document.getElementById("boss-fill"),
+  bossPhase: document.getElementById("boss-phase")
 };
 function fmtTime(sec) {
   var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
@@ -545,6 +949,32 @@ function updateHud() {
     hudCache.odMode = odMode;
     el.odWrap.className = odMode;
     el.odGlow.className = odActive ? "on" : "";
+  }
+  updateBossBar();
+}
+// ボスバー：砲塔＋本体の残量合算を1本で示す。処刑突入時は砕ける演出を
+// 優先し、演出が終わったら隠す。値が変わった時だけDOMへ触る。
+var bossBarCache = { pct: -1, phase: "", visible: null };
+function updateBossBar() {
+  var show = !!boss && boss.phase !== "exec";
+  if (bossBarShatterT > 0) show = true; // 砕ける演出の間は出し続ける
+  if (!boss && bossBarShatterT <= 0) show = false;
+  if (show !== bossBarCache.visible) {
+    bossBarCache.visible = show;
+    el.bossWrap.hidden = !show;
+    if (show) el.bossWrap.className = boss && boss.phase === 2 ? "phase2" : "";
+  }
+  if (!show || !boss) return;
+  if (bossBarShatterT > 0) return; // 砕ける演出中はクラス・値を触らない
+  var cur = Math.max(boss.coreHp, 0);
+  for (var i = 0; i < boss.turrets.length; i++) cur += Math.max(boss.turrets[i].hp, 0);
+  var pct = Math.round(cur / boss.totalMax * 100);
+  if (pct !== bossBarCache.pct) { bossBarCache.pct = pct; el.bossFill.style.width = pct + "%"; }
+  var ph = boss.phase === 2 ? "PHASE 2" : "PHASE 1";
+  if (ph !== bossBarCache.phase) {
+    bossBarCache.phase = ph;
+    el.bossPhase.textContent = ph;
+    el.bossWrap.className = boss.phase === 2 ? "phase2" : "";
   }
 }
 
