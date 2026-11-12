@@ -251,7 +251,6 @@ function resetGame() {
   drones = []; capsules = [];
   odDur = OD_DURATION; odFireMul = OD_FIRE_MUL_BASE; odMoveMul = OD_MOVE_MUL_BASE;
   odOffsets = NOZZLE_OFFSETS; odForwards = NOZZLE_FORWARD; odMuzzles = MUZZLE_POS;
-  playerTrail.length = 0;
   score = 0; elapsed = 0; shake = 0;
   director.timer = 0.6;
   leftStick.active = false; rightStick.active = false;
@@ -714,10 +713,9 @@ function bossBulletCollisions() {
    子機（ドローン）
    役割ごとに指定位置へ追従し、アタッカーは散弾、ガードは
    シールド、ブースターはOD強化を担う。全機が敵弾を体で防ぎ、
-   HPが尽きると10秒の機能停止に入る（OD発動で即復帰）。
+   HPが尽きると30秒の機能停止に入る（OD発動では回復しない）。
    数値は config.js の DRONE_* / CAPSULE_* を参照する。
    ============================================================ */
-var playerTrail = []; // ブースターの尾行用：自機の直近の移動履歴
 function droneCount(role) {
   var n = 0;
   for (var i = 0; i < drones.length; i++) if (drones[i].role === role) n++;
@@ -733,18 +731,10 @@ function addDrone(role) {
   var idx = droneCount(role);
   drones.push({
     role: role, x: player.x, y: player.y,
-    hp: DRONE_HP, down: false, reviveT: 0,
+    hp: DRONE_HP[role], maxHp: DRONE_HP[role], down: false, reviveT: 0,
     fireTimer: 0.25 + idx * 0.13, // 複数機は発射タイミングをずらす
     aim: player.angle
   });
-}
-// OD発動時：全子機が即座に全回復・復帰する
-function reviveAllDrones() {
-  for (var i = 0; i < drones.length; i++) {
-    drones[i].hp = DRONE_HP;
-    drones[i].down = false;
-    drones[i].reviveT = 0;
-  }
 }
 // 点(x, y)を覆っている稼働中ガードの数（ダメージカットの計算用）
 function guardCoverCount(x, y) {
@@ -758,7 +748,7 @@ function guardCoverCount(x, y) {
   return n;
 }
 // 子機が敵弾を受けた：弾1発＝ダメージ1（ガード圏内ならカット適用）。
-// HPが尽きると機能停止し、10秒後に自動復帰する。
+// HPが尽きると機能停止し、30秒後に自動復帰する。
 function damageDrone(d) {
   if (d.down) return;
   var cutMul = 1 - DRONE_GUARD_CUT * guardCoverCount(d.x, d.y);
@@ -802,30 +792,14 @@ function droneSlotTarget(d, idx) {
   }
   return { x: player.x + ca * f + px * s, y: player.y + sa * f + py * s };
 }
-// ブースターの目標点：自機の移動履歴をたどり、(idx+1)機分後ろの点
-function boosterTrailTarget(idx) {
+// ブースターの目標点：自機の向いている方向（照準方向）の後ろ側に、
+// (idx+1)機分離れて一列に並ぶ点。自機が向きを変えると尾も後ろ側へ
+// 回り込む（追従は速度上限付きなので、多少の遅れとたわみが出る）。
+function boosterTailTarget(idx) {
   var want = (idx + 1) * DRONE_BOOSTER_GAP;
-  var acc = 0, prev = { x: player.x, y: player.y };
-  for (var i = 0; i < playerTrail.length; i++) {
-    var p = playerTrail[i];
-    var dx = p.x - prev.x, dy = p.y - prev.y;
-    var seg = Math.sqrt(dx * dx + dy * dy);
-    if (acc + seg >= want && seg > 0) {
-      var k = (want - acc) / seg;
-      return { x: prev.x + dx * k, y: prev.y + dy * k };
-    }
-    acc += seg; prev = p;
-  }
-  // 履歴が足りない間は自機の真後ろに並ぶ
   return { x: player.x - Math.cos(player.angle) * want, y: player.y - Math.sin(player.angle) * want };
 }
 function updateDrones(dt) {
-  // 自機の移動履歴（ブースターの尾行用）：少し動くたびに記録する
-  var last = playerTrail[0];
-  if (!last || (player.x - last.x) * (player.x - last.x) + (player.y - last.y) * (player.y - last.y) > 16) {
-    playerTrail.unshift({ x: player.x, y: player.y });
-    if (playerTrail.length > 360) playerTrail.length = 360;
-  }
   var roleIdx = { attacker: 0, guard: 0, booster: 0 };
   for (var i = 0; i < drones.length; i++) {
     var d = drones[i];
@@ -833,11 +807,11 @@ function updateDrones(dt) {
     // 機能停止中は復帰タイマーを進める（追従だけは続ける）
     if (d.down) {
       d.reviveT -= dt;
-      if (d.reviveT <= 0) { d.down = false; d.hp = DRONE_HP; burst(d.x, d.y, DRONE_ROLES[d.role].color, 6); }
+      if (d.reviveT <= 0) { d.down = false; d.hp = d.maxHp; burst(d.x, d.y, DRONE_ROLES[d.role].color, 6); }
     }
     // ---- 指定位置への追従 ----
     if (d.role === "booster") {
-      var bt = boosterTrailTarget(idx);
+      var bt = boosterTailTarget(idx);
       var bdx = bt.x - d.x, bdy = bt.y - d.y;
       var bdist = Math.sqrt(bdx * bdx + bdy * bdy);
       if (bdist > 0.5) {
@@ -929,19 +903,49 @@ function updateCapsules(dt) {
     }
   }
 }
+// カプセル取得時の処理（役割ごとに次の優先順位）：
+// 1. 空きスロットがある → 新しい子機が1機増える
+// 2. 満員で機能停止中の子機がいる → 復帰までの残り時間が一番長い
+//    子機が、その場で完全修理される（HP全回復＋即座に稼働再開）
+// 3. 満員で停止中はいないが傷ついた子機がいる → HPの残りが一番
+//    少ない子機が完全修理される（HP全回復）
+// 4. 満員で全機が無傷 → 代替報酬+300点（スコアのみ、HP回復はなし）
 function pickupCapsule(c) {
   var role = c.role;
   if (role === "random") role = DRONE_ROLE_ORDER[Math.floor(Math.random() * 3)];
+  var text = null, color = DRONE_ROLES[role].color;
   if (droneCount(role) < DRONE_ROLES[role].max) {
     addDrone(role);
-    if (popups.length >= MAX_POPUPS) popups.shift();
-    popups.push({ x: player.x, y: player.y - 26, text: DRONE_ROLES[role].name + " +1", life: 0.9, maxLife: 0.9, pop: 1, big: true, color: DRONE_ROLES[role].color });
+    text = DRONE_ROLES[role].name + " +1";
   } else {
-    // 上限の役割は代替報酬：+300点のみ（HP回復はなし）
-    score += CAPSULE_FALLBACK_SCORE;
-    if (popups.length >= MAX_POPUPS) popups.shift();
-    popups.push({ x: player.x, y: player.y - 26, text: "+" + CAPSULE_FALLBACK_SCORE, life: 0.9, maxLife: 0.9, pop: 1, big: true, color: "#e8f6ff" });
+    var repair = null, i, d;
+    // 優先2：停止中の中で、復帰までの残り時間（reviveT）が一番長い機
+    for (i = 0; i < drones.length; i++) {
+      d = drones[i];
+      if (d.role === role && d.down && (!repair || d.reviveT > repair.reviveT)) repair = d;
+    }
+    // 優先3：稼働中の中で、HPの残りが一番少ない機
+    if (!repair) {
+      for (i = 0; i < drones.length; i++) {
+        d = drones[i];
+        if (d.role === role && !d.down && d.hp < d.maxHp && (!repair || d.hp < repair.hp)) repair = d;
+      }
+    }
+    if (repair) {
+      repair.hp = repair.maxHp;
+      repair.down = false;
+      repair.reviveT = 0;
+      burst(repair.x, repair.y, color, 8);
+      spawnRing(repair.x, repair.y, color, 1);
+      text = DRONE_ROLES[role].name + " 修理完了";
+    } else {
+      score += CAPSULE_FALLBACK_SCORE;
+      text = "+" + CAPSULE_FALLBACK_SCORE;
+      color = "#e8f6ff";
+    }
   }
+  if (popups.length >= MAX_POPUPS) popups.shift();
+  popups.push({ x: player.x, y: player.y - 26, text: text, life: 0.9, maxLife: 0.9, pop: 1, big: true, color: color });
   sfxPickup();
   updateHud();
 }
