@@ -13,6 +13,7 @@ function drawBulletTrails(gold, outerColor, innerColor) {
   ctx.beginPath();
   for (i = 0; i < bullets.length; i++) {
     tb = bullets[i];
+    if (tb.drone) continue; // 子機の散弾の粒には残光を付けない
     if (!!tb.gold !== gold) continue;
     any = true;
     spd = Math.sqrt(tb.vx * tb.vx + tb.vy * tb.vy) || 1;
@@ -27,6 +28,7 @@ function drawBulletTrails(gold, outerColor, innerColor) {
   ctx.beginPath();
   for (i = 0; i < bullets.length; i++) {
     tb = bullets[i];
+    if (tb.drone) continue;
     if (!!tb.gold !== gold) continue;
     spd = Math.sqrt(tb.vx * tb.vx + tb.vy * tb.vy) || 1;
     ux = tb.vx / spd; uy = tb.vy / spd;
@@ -109,6 +111,9 @@ function draw() {
     ctx.restore();
   }
 
+  // ドロップカプセル
+  drawCapsules();
+
   // ボス本体と砲塔
   if (boss) drawBoss();
 
@@ -145,6 +150,10 @@ function draw() {
   // 自機の弾（向きに合わせて回転。発動中の弾は金色で大きく描く）
   for (i = 0; i < bullets.length; i++) {
     var b = bullets[i];
+    if (b.drone) { // 子機の散弾の粒（オレンジの小粒）
+      ctx.drawImage(SPR.pellet.c, b.x - SPR.pellet.w / 2, b.y - SPR.pellet.h / 2, SPR.pellet.w, SPR.pellet.h);
+      continue;
+    }
     var bspr = b.gold ? SPR.bulletGold : SPR.bullet;
     var bw = bspr.w * b.sizeMul, bh = bspr.h * b.sizeMul;
     ctx.save();
@@ -156,6 +165,9 @@ function draw() {
 
   // 敵
   for (i = 0; i < enemies.length; i++) drawEnemy(enemies[i]);
+
+  // 子機（シールド→本体の順）
+  drawDrones();
 
   // 自機
   if (state !== "over") drawPlayer();
@@ -325,6 +337,11 @@ function drawMinimap() {
     ctx.fillStyle = boss.phase === 2 ? "#ff8a7a" : "#bfefff";
     ctx.fillRect(mx + boss.x * sx - 3, my + boss.y * sy - 3, 6, 6);
   }
+  // カプセル（小さな点。色は役割色、ランダムは白銀）
+  for (i = 0; i < capsules.length; i++) {
+    ctx.fillStyle = capsules[i].role === "random" ? "#e8ecf2" : DRONE_ROLES[capsules[i].role].color;
+    ctx.fillRect(mx + capsules[i].x * sx - 1.5, my + capsules[i].y * sy - 1.5, 3, 3);
+  }
   // 自機
   ctx.fillStyle = "#22e6ff";
   ctx.beginPath();
@@ -474,6 +491,116 @@ function drawBoss() {
     ctx.fillRect(b.x - 44, b.y - b.r - 16, 88, 4);
     ctx.fillStyle = "#ffc233";
     ctx.fillRect(b.x - 44, b.y - b.r - 16, 88 * Math.max(b.execHp, 0) / b.execMax, 4);
+  }
+}
+
+// ドロップカプセル：役割色の輪＋中身の印。残り3秒を切ると点滅する。
+// タンクのランダムカプセルは白銀色で「？」表示（中身は拾うまで不明）。
+function drawCapsules() {
+  for (var i = 0; i < capsules.length; i++) {
+    var c = capsules[i];
+    if (Math.abs(c.x - player.x) > VIEW_W / 2 + 40 || Math.abs(c.y - player.y) > VIEW_H / 2 + 40) continue;
+    if (c.life < 3 && Math.floor(performance.now() / 140) % 2 === 0) continue; // 点滅
+    var bobY = Math.sin(performance.now() / 300 + c.phase) * 3;
+    var col = c.role === "random" ? "#e8ecf2" : DRONE_ROLES[c.role].color;
+    ctx.save();
+    ctx.translate(c.x, c.y + bobY);
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath(); ctx.arc(0, 0, 10, 0, Math.PI * 2); ctx.fill();
+    if (c.role === "random") {
+      ctx.fillStyle = "#e8ecf2";
+      ctx.font = "700 11px Orbitron, monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("?", 0, 4);
+    } else if (c.role === "attacker") {
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(0, -4.5); ctx.lineTo(4, 3.5); ctx.lineTo(-4, 3.5); ctx.closePath(); ctx.fill();
+    } else if (c.role === "guard") {
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(0, 0.5, 4.2, Math.PI * 0.95, Math.PI * 2.05); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(0, 1, 2, 0, Math.PI * 2); ctx.fill();
+    } else { // booster
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, 4.4, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+// 子機：ガードのシールド（薄い円）を先に描き、本体を役割の形で描く。
+// 機能停止中はグレーで半透明になり、復帰までの円形ゲージを添える。
+function drawDrones() {
+  var i, d;
+  for (i = 0; i < drones.length; i++) {
+    d = drones[i];
+    if (d.role !== "guard" || d.down) continue;
+    ctx.save();
+    ctx.fillStyle = "rgba(45, 123, 255, 0.05)";
+    ctx.beginPath(); ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(140, 190, 255, 0.26)";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  for (i = 0; i < drones.length; i++) {
+    d = drones[i];
+    var col = d.down ? "#8a97a8" : DRONE_ROLES[d.role].color;
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    if (d.down) ctx.globalAlpha = 0.45;
+    ctx.shadowColor = col;
+    ctx.shadowBlur = d.down ? 0 : 10;
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    if (d.role === "attacker") {
+      ctx.rotate(d.aim + Math.PI / 2);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(6, 6); ctx.lineTo(-6, 6); ctx.closePath(); ctx.stroke();
+      ctx.globalAlpha *= 0.18;
+      ctx.fill();
+      ctx.globalAlpha = d.down ? 0.45 : 1;
+    } else if (d.role === "guard") {
+      ctx.rotate(player.angle + Math.PI / 2);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 2, 4.6, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = d.down ? "#8a97a8" : "#9fd0ff";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath(); ctx.arc(0, 0, 7.6, -Math.PI * 0.82, -Math.PI * 0.18); ctx.stroke();
+    } else { // booster：金の小リング
+      ctx.lineWidth = 3.4;
+      ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    // 傷ついた子機は上に小さなHPバー
+    if (!d.down && d.hp < DRONE_HP) {
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.fillRect(d.x - 8, d.y - 15, 16, 2.5);
+      ctx.fillStyle = DRONE_ROLES[d.role].color;
+      ctx.fillRect(d.x - 8, d.y - 15, 16 * Math.max(d.hp, 0) / DRONE_HP, 2.5);
+    }
+    // 機能停止中：復帰までの円形ゲージ
+    if (d.down) {
+      var prog = 1 - Math.max(d.reviveT, 0) / DRONE_REVIVE_TIME;
+      ctx.save();
+      ctx.strokeStyle = "rgba(200, 214, 230, 0.3)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(d.x, d.y, 13, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "#d7e6f5";
+      ctx.beginPath(); ctx.arc(d.x, d.y, 13, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
   }
 }
 
@@ -638,7 +765,7 @@ function drawPlayer() {
     ctx.globalAlpha = Math.min(player.muzzle / 0.05, 1);
     ctx.globalCompositeOperation = "lighter";
     var ms = SPR.muzzle.w * (0.85 + (0.05 - player.muzzle) * 3);
-    var mpos = odActive ? OD_MUZZLE_POS : MUZZLE_POS;
+    var mpos = odActive ? odMuzzles : MUZZLE_POS;
     for (var mi = 0; mi < mpos.length; mi++) {
       ctx.drawImage(SPR.muzzle.c, mpos[mi][0] - ms / 2, mpos[mi][1] - ms / 2, ms, ms);
     }

@@ -126,6 +126,11 @@ SPR.bulletGold = makeSprite(28, 40, function (g) { // オーバードライブ�
   g.arcTo(x, y, x + w, y, r);
   g.closePath(); g.fill();
 });
+SPR.pellet = makeSprite(20, 20, function (g) { // 子機アタッカーの散弾の粒（オレンジ）
+  g.shadowColor = "#ff8c1a"; g.shadowBlur = 8;
+  g.fillStyle = "#ffd9a8";
+  g.beginPath(); g.arc(0, 0, 3, 0, Math.PI * 2); g.fill();
+});
 SPR.ebullet = makeSprite(38, 38, function (g) { // 敵弾
   g.shadowColor = "#ff7a1a"; g.shadowBlur = 12;
   g.fillStyle = "#ffb03a";

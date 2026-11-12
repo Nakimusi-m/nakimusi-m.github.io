@@ -150,6 +150,26 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #core-wrap.active .core-od, #core-wrap.active #od-num { color: #ffd968; }
 @keyframes odBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
+/* ---------- 子機HUD（HP／ODバーの下） ---------- */
+#drone-row {
+  margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  pointer-events: none;
+}
+#drone-row[hidden] { display: none; }
+.drone-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 7px 2px 4px;
+  background: rgba(8, 16, 36, 0.62);
+  border: 1px solid rgba(140, 190, 230, 0.3);
+  font-family: Orbitron, monospace; font-size: 11px; color: var(--text);
+}
+.drone-chip svg { width: 15px; height: 15px; overflow: visible; }
+.drone-chip.down {
+  color: #7e8fa3; border-color: rgba(140, 160, 190, 0.22);
+  font-family: "Hiragino Kaku Gothic ProN", sans-serif; font-size: 10px;
+  padding: 2px 6px;
+}
+
 /* ---------- ボスバー（画面上部中央、ボス戦中だけ表示） ---------- */
 #boss-wrap {
   position: absolute; left: 50%; top: calc(10px + env(safe-area-inset-top));
@@ -329,6 +349,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .howto .pc-row { display: none; }
   .howto .weapon-row { display: none; }
   .howto .od-row { display: none; }
+  .howto .drone-row { display: none; }
   .howto .boss-row { display: none; }
   .icon-btn { width: 36px; height: 36px; min-height: 36px; }
   .btn-row { margin-top: 8px; gap: 8px; flex-wrap: nowrap; }
