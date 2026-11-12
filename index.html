@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#04060f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="NEON STRIKER" />
+    <link rel="manifest" href="assets/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="assets/icon-180.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
+    <title>NEON STRIKER</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/style.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="game"></canvas>
+      <div id="od-glow"></div>
+
+      <div id="hud">
+        <div class="row">
+          <div class="hud-block">
+            <div class="hud-label">SCORE</div>
+            <div class="hud-value" id="score">0</div>
+          </div>
+          <div class="hud-block" id="hud-best">
+            <div class="hud-label">BEST</div>
+            <div class="hud-value" id="best">0</div>
+          </div>
+          <div class="hud-block" id="hud-time">
+            <div class="hud-label">TIME</div>
+            <div class="hud-value" id="time">0:00</div>
+          </div>
+          <div class="hud-btns">
+            <button class="icon-btn" id="btn-sound" aria-label="サウンドのオン・オフ">
+              <svg viewBox="0 0 24 24" id="ic-sound-on"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9c1.2 1.6 1.2 4.4 0 6"/><path d="M18.5 6.5c2.4 3 2.4 8 0 11"/></svg>
+              <svg viewBox="0 0 24 24" id="ic-sound-off" style="display:none"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-fs" aria-label="全画面（横向き固定）">
+              <svg viewBox="0 0 24 24" id="ic-fs-expand"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              <svg viewBox="0 0 24 24" id="ic-fs-shrink" style="display:none"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
+            </button>
+            <button class="icon-btn" id="btn-pause" aria-label="一時停止">
+              <svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14" stroke-width="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="core-wrap">
+          <div id="core-head"><span>HP<span id="hp-num">100</span></span><span class="core-od">OVERDRIVE<span id="od-num">0%</span></span></div>
+          <div id="core-bar"><div id="hp-fill"></div><div id="od-fill"></div></div>
+        </div>
+      </div>
+
+      <div class="overlay" id="ov-title">
+        <h1 class="game-title">NEON <span class="accent">STRIKER</span></h1>
+        <p class="tagline">全方位ツインスティック・スコアアタック</p>
+        <p class="rotate-note">下の「全画面で遊ぶ」ボタンで横向きに固定できます</p>
+        <ul class="howto">
+          <li><span class="k">LEFT STICK</span>画面左半分をドラッグ ― 移動</li>
+          <li><span class="k">RIGHT STICK</span>画面右半分をドラッグ ― その向きを向いて、傾けている間撃ち続ける</li>
+          <li class="weapon-row"><span class="k">WEAPON</span>ツインノズル ― 弾を2本同時発射・連射速度2倍（1発のダメージは小さめ）</li>
+          <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 8秒間、弾が4本（端は少し後ろから）になり弾速3倍・貫通、自機も金色に加速</li>
+          <li class="pc-row"><span class="k">PC</span>WASD／矢印キーで移動、マウスで狙ってクリックで射撃</li>
+          <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
+        </ul>
+        <div class="enemy-legend" aria-hidden="true">
+          <figure>
+            <svg viewBox="-20 -20 40 40"><rect x="-11" y="-11" width="22" height="22" fill="none" stroke="#ff2d78" stroke-width="3"/></svg>
+            <figcaption>追跡 ・ 100</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><path d="M0 -14 L11 0 L0 14 L-11 0 Z" fill="none" stroke="#b26bff" stroke-width="3"/></svg>
+            <figcaption>揺れ追跡 ・ 150</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><path d="M12 -7 L12 7 L0 14 L-12 7 L-12 -7 L0 -14 Z" fill="none" stroke="#ff4040" stroke-width="3"/></svg>
+            <figcaption>射撃 ・ 300</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><path d="M0 -14 L12 10 L-12 10 Z" fill="none" stroke="#ff8c1a" stroke-width="3"/></svg>
+            <figcaption>ダッシュ ・ 120</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><path d="M0 -13 L12 -4 L7 11 L-7 11 L-12 -4 Z" fill="none" stroke="#3dff7a" stroke-width="3"/></svg>
+            <figcaption>分裂 ・ 250</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="13" fill="none" stroke="#e8ecf2" stroke-width="3"/><circle cx="0" cy="0" r="6" fill="none" stroke="#e8ecf2" stroke-width="2"/></svg>
+            <figcaption>拡散弾 ・ 800</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><path d="M0 -14 L4 -4 L14 -4 L6 3 L9 13 L0 7 L-9 13 L-6 3 L-14 -4 L-4 -4 Z" fill="none" stroke="#ffd51f" stroke-width="2.5"/></svg>
+            <figcaption>回転弾幕 ・ 400</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="3" r="9" fill="none" stroke="#2d7bff" stroke-width="3"/><path d="M-13 -6 A14 14 0 0 1 13 -6" fill="none" stroke="#9fd0ff" stroke-width="4"/></svg>
+            <figcaption>正面ガード ・ 350</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="12" fill="none" stroke="#ff2a2a" stroke-width="3"/><circle cx="0" cy="0" r="4" fill="#ff2a2a"/></svg>
+            <figcaption>自爆 ・ 200</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><g stroke="#7fd8ff" stroke-width="2.5" stroke-linecap="round"><path d="M0 -13 V13 M-11 -6.5 L11 6.5 M-11 6.5 L11 -6.5"/></g><circle cx="0" cy="0" r="2.5" fill="#7fd8ff"/></svg>
+            <figcaption>凍結エリア ・ 200</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><path d="M0 -15 L6 9 L0 3 L-6 9 Z" fill="none" stroke="#b6ff2e" stroke-width="2.5"/></svg>
+            <figcaption>狙撃 ・ 250</figcaption>
+          </figure>
+          <figure>
+            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/></svg>
+            <figcaption>支援 ・ 300</figcaption>
+          </figure>
+        </div>
+        <div class="btn-row">
+          <button class="big-btn" id="btn-start">START</button>
+          <button class="sub-btn" id="btn-fs-title">
+            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+            全画面で遊ぶ
+          </button>
+        </div>
+      </div>
+
+      <div class="overlay" id="ov-over" hidden>
+        <h2 class="over-title">GAME OVER</h2>
+        <dl class="result-grid">
+          <dt>SCORE</dt><dd id="final-score">0</dd>
+          <dt>BEST</dt><dd class="small" id="final-best">0</dd>
+          <dt>TIME</dt><dd class="small" id="final-time">0:00</dd>
+        </dl>
+        <p class="new-record" id="new-record" hidden>NEW RECORD</p>
+        <button class="big-btn" id="btn-retry">RETRY</button>
+      </div>
+
+      <div class="overlay" id="ov-pause" hidden>
+        <h2 class="pause-title">PAUSED</h2>
+        <button class="big-btn" id="btn-resume">RESUME</button>
+      </div>
+    </div>
+
+    <script src="assets/config.js"></script>
+    <script src="assets/utils.js"></script>
+    <script src="assets/view.js"></script>
+    <script src="assets/components.js"></script>
+    <script src="assets/enemies.js"></script>
+    <script src="assets/sprites.js"></script>
+    <script src="assets/audio.js"></script>
+    <script src="assets/fx.js"></script>
+    <script src="assets/game.js"></script>
+    <script src="assets/render.js"></script>
+    <script src="assets/input.js"></script>
+    <script src="assets/main.js"></script>
+  </body>
+</html>
