@@ -184,6 +184,23 @@ var bossSpawnCount = 0;       // 登場回数（HP倍率・氷結弾間隔の計
 var bossKills = 0;            // 撃破数（撃破ごとに難易度が1段上がる）
 var quietTimer = 0;           // 撃破後の静けさの残り時間（秒）
 var odFrozen = false;         // 処刑中はオーバードライブのタイマーを止める
+// ---- 子機（ドローン）用ステート ----
+var drones = [];              // 所持中の子機 {role, x, y, hp, down, reviveT, fireTimer, aim}
+var capsules = [];            // 漂っているドロップカプセル {x, y, role, life}
+// ---- オーバードライブの発動中スナップショット ----
+// 発動の瞬間の稼働ブースター数で固定される値（発動中にブースターが
+// 停止しても、その回の時間・ノズル数・上昇量は変わらない）。
+var odDur = OD_DURATION;      // その回の持続時間
+var odFireMul = OD_FIRE_MUL_BASE;  // その回の連射間隔倍率
+var odMoveMul = OD_MOVE_MUL_BASE;  // その回の移動速度倍率
+var odOffsets = NOZZLE_OFFSETS, odForwards = NOZZLE_FORWARD, odMuzzles = MUZZLE_POS;
+// 子機の役割定義（順序はボス報酬の優先順位にも使う）
+var DRONE_ROLES = {
+  attacker: { max: DRONE_ATTACKER_MAX, name: "アタッカー", color: "#ff8c1a" },
+  guard: { max: DRONE_GUARD_MAX, name: "ガード", color: "#2d7bff" },
+  booster: { max: DRONE_BOOSTER_MAX, name: "ブースター", color: "#ffc233" }
+};
+var DRONE_ROLE_ORDER = ["attacker", "guard", "booster"];
 var iceShots = [];            // 飛行中の氷結弾 {x,y,tx,ty,t,dur}
 var warnSfxT = 0;             // 警報音の間引きタイマ
 var bossBarShatterT = 0;      // ボスバーの「砕ける」演出の残り時間
@@ -231,6 +248,10 @@ function resetGame() {
   boss = null; bossWarnT = 0; bossNextTime = BOSS_FIRST_TIME;
   bossSpawnCount = 0; bossKills = 0; quietTimer = 0;
   odFrozen = false; iceShots = []; warnSfxT = 0; bossBarShatterT = 0;
+  drones = []; capsules = [];
+  odDur = OD_DURATION; odFireMul = OD_FIRE_MUL_BASE; odMoveMul = OD_MOVE_MUL_BASE;
+  odOffsets = NOZZLE_OFFSETS; odForwards = NOZZLE_FORWARD; odMuzzles = MUZZLE_POS;
+  playerTrail.length = 0;
   score = 0; elapsed = 0; shake = 0;
   director.timer = 0.6;
   leftStick.active = false; rightStick.active = false;
@@ -569,7 +590,7 @@ function enterExecution() {
   b.execTimer = 0;
   enemyBullets = []; // 決着の瞬間に弾幕は消える
   odGauge = 100;
-  if (!odActive) activateOverdrive(); else { odTimer = OD_DURATION; }
+  if (!odActive) activateOverdrive(); else { odTimer = odDur; }
   odFrozen = true;
   bossBarShatterT = 0.6; // ボスバーは砕けて消える
   var bossWrapEl = document.getElementById("boss-wrap");
@@ -617,6 +638,7 @@ function finishBoss() {
   }
   boss = null;
   bossKills++;
+  grantBossDroneReward(); // 撃破報酬：子機+1（全役割上限なら+1,000点）
   quietTimer = BOSS_QUIET_TIME;
   bossNextTime = elapsed + BOSS_INTERVAL;
   odFrozen = false; // 処刑後もODが残っていれば通常タイマーで継続する
@@ -689,6 +711,268 @@ function bossBulletCollisions() {
 }
 
 /* ============================================================
+   子機（ドローン）
+   役割ごとに指定位置へ追従し、アタッカーは散弾、ガードは
+   シールド、ブースターはOD強化を担う。全機が敵弾を体で防ぎ、
+   HPが尽きると10秒の機能停止に入る（OD発動で即復帰）。
+   数値は config.js の DRONE_* / CAPSULE_* を参照する。
+   ============================================================ */
+var playerTrail = []; // ブースターの尾行用：自機の直近の移動履歴
+function droneCount(role) {
+  var n = 0;
+  for (var i = 0; i < drones.length; i++) if (drones[i].role === role) n++;
+  return n;
+}
+// 稼働中（機能停止でない）ブースターの数。ODの強化計算に使う
+function activeBoosterCount() {
+  var n = 0;
+  for (var i = 0; i < drones.length; i++) if (drones[i].role === "booster" && !drones[i].down) n++;
+  return n;
+}
+function addDrone(role) {
+  var idx = droneCount(role);
+  drones.push({
+    role: role, x: player.x, y: player.y,
+    hp: DRONE_HP, down: false, reviveT: 0,
+    fireTimer: 0.25 + idx * 0.13, // 複数機は発射タイミングをずらす
+    aim: player.angle
+  });
+}
+// OD発動時：全子機が即座に全回復・復帰する
+function reviveAllDrones() {
+  for (var i = 0; i < drones.length; i++) {
+    drones[i].hp = DRONE_HP;
+    drones[i].down = false;
+    drones[i].reviveT = 0;
+  }
+}
+// 点(x, y)を覆っている稼働中ガードの数（ダメージカットの計算用）
+function guardCoverCount(x, y) {
+  var n = 0;
+  for (var i = 0; i < drones.length; i++) {
+    var d = drones[i];
+    if (d.role !== "guard" || d.down) continue;
+    var dx = x - d.x, dy = y - d.y;
+    if (dx * dx + dy * dy <= DRONE_GUARD_SHIELD_R * DRONE_GUARD_SHIELD_R) n++;
+  }
+  return n;
+}
+// 子機が敵弾を受けた：弾1発＝ダメージ1（ガード圏内ならカット適用）。
+// HPが尽きると機能停止し、10秒後に自動復帰する。
+function damageDrone(d) {
+  if (d.down) return;
+  var cutMul = 1 - DRONE_GUARD_CUT * guardCoverCount(d.x, d.y);
+  d.hp -= cutMul;
+  spawnSparks(d.x, d.y, DRONE_ROLES[d.role].color, 3);
+  if (d.hp <= 0) {
+    d.hp = 0; d.down = true; d.reviveT = DRONE_REVIVE_TIME;
+    burst(d.x, d.y, "#8a97a8", 8);
+    sfxDroneDown();
+  }
+}
+// OD発動の瞬間に、その回の時間・連射・移動・ノズル数を固定する
+function snapshotOverdrive() {
+  var b = activeBoosterCount();
+  odDur = OD_DURATION + OD_TIME_PER_BOOSTER * b;
+  var frac = b / DRONE_BOOSTER_MAX; // 0機で半分、3機で現行どおりへ線形補間
+  odFireMul = OD_FIRE_MUL_BASE + (OD_FIRE_INTERVAL_MUL - OD_FIRE_MUL_BASE) * frac;
+  odMoveMul = OD_MOVE_MUL_BASE + (OD_MOVE_SPEED_MUL - OD_MOVE_MUL_BASE) * frac;
+  var n = 2 + b; // ノズル数：2＋稼働ブースター数（最大5）
+  if (n === 2) { odOffsets = [-7, 7]; odForwards = [20, 20]; }
+  else if (n === 3) { odOffsets = [-11, 0, 11]; odForwards = [13, 20, 13]; }
+  else if (n === 4) { odOffsets = OD_NOZZLE_OFFSETS; odForwards = OD_NOZZLE_FORWARD; }
+  else { odOffsets = [-14, -7, 0, 7, 14]; odForwards = [12, 18, 20, 18, 12]; }
+  odMuzzles = [];
+  for (var i = 0; i < odOffsets.length; i++) odMuzzles.push([odOffsets[i], -odForwards[i] - 2]);
+}
+// 役割ごとの指定位置（基準は自機の向き）。idx は同役割内の順番。
+function droneSlotTarget(d, idx) {
+  var ca = Math.cos(player.angle), sa = Math.sin(player.angle);
+  var px = -sa, py = ca; // 進行方向と直角
+  var f, s;
+  if (d.role === "attacker") {
+    // 斜め四隅：前方左・前方右・後方左・後方右の順に埋まる
+    var diag = DRONE_ATTACKER_DIST / Math.SQRT2;
+    f = (idx < 2) ? diag : -diag;
+    s = (idx % 2 === 0) ? -diag : diag;
+  } else { // guard：斜め後方2か所
+    var gdiag = DRONE_GUARD_DIST / Math.SQRT2;
+    f = -gdiag;
+    s = (idx === 0) ? -gdiag : gdiag;
+  }
+  return { x: player.x + ca * f + px * s, y: player.y + sa * f + py * s };
+}
+// ブースターの目標点：自機の移動履歴をたどり、(idx+1)機分後ろの点
+function boosterTrailTarget(idx) {
+  var want = (idx + 1) * DRONE_BOOSTER_GAP;
+  var acc = 0, prev = { x: player.x, y: player.y };
+  for (var i = 0; i < playerTrail.length; i++) {
+    var p = playerTrail[i];
+    var dx = p.x - prev.x, dy = p.y - prev.y;
+    var seg = Math.sqrt(dx * dx + dy * dy);
+    if (acc + seg >= want && seg > 0) {
+      var k = (want - acc) / seg;
+      return { x: prev.x + dx * k, y: prev.y + dy * k };
+    }
+    acc += seg; prev = p;
+  }
+  // 履歴が足りない間は自機の真後ろに並ぶ
+  return { x: player.x - Math.cos(player.angle) * want, y: player.y - Math.sin(player.angle) * want };
+}
+function updateDrones(dt) {
+  // 自機の移動履歴（ブースターの尾行用）：少し動くたびに記録する
+  var last = playerTrail[0];
+  if (!last || (player.x - last.x) * (player.x - last.x) + (player.y - last.y) * (player.y - last.y) > 16) {
+    playerTrail.unshift({ x: player.x, y: player.y });
+    if (playerTrail.length > 360) playerTrail.length = 360;
+  }
+  var roleIdx = { attacker: 0, guard: 0, booster: 0 };
+  for (var i = 0; i < drones.length; i++) {
+    var d = drones[i];
+    var idx = roleIdx[d.role]++;
+    // 機能停止中は復帰タイマーを進める（追従だけは続ける）
+    if (d.down) {
+      d.reviveT -= dt;
+      if (d.reviveT <= 0) { d.down = false; d.hp = DRONE_HP; burst(d.x, d.y, DRONE_ROLES[d.role].color, 6); }
+    }
+    // ---- 指定位置への追従 ----
+    if (d.role === "booster") {
+      var bt = boosterTrailTarget(idx);
+      var bdx = bt.x - d.x, bdy = bt.y - d.y;
+      var bdist = Math.sqrt(bdx * bdx + bdy * bdy);
+      if (bdist > 0.5) {
+        var bstep = Math.min(bdist, Math.max(DRONE_FOLLOW_TAIL_SPEED * dt, bdist * Math.min(1, dt * 14)));
+        d.x += bdx / bdist * bstep; d.y += bdy / bdist * bstep;
+      }
+    } else {
+      var t = droneSlotTarget(d, idx);
+      var dx = t.x - d.x, dy = t.y - d.y;
+      if (d.role === "guard") {
+        // ガードだけ意図的に遅い：最大追従速度に上限があり、
+        // 自機が高速で動き続けると置いていかれる
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0.5) {
+          var step = Math.min(dist * Math.min(1, dt * 6), DRONE_GUARD_FOLLOW_SPEED * dt);
+          d.x += dx / dist * step; d.y += dy / dist * step;
+        }
+      } else {
+        var k = Math.min(1, dt * DRONE_FOLLOW_FAST);
+        d.x += dx * k; d.y += dy * k;
+      }
+    }
+    d.x = clamp(d.x, 8, WORLD_W - 8); d.y = clamp(d.y, 8, WORLD_H - 8);
+    // ---- アタッカーの散弾 ----
+    if (d.role === "attacker" && !d.down) {
+      d.fireTimer -= dt;
+      if (d.fireTimer <= 0) {
+        d.fireTimer = DRONE_ATTACKER_INTERVAL;
+        droneAttackerFire(d);
+      }
+    }
+  }
+}
+// アタッカー：最寄りの敵（ボスの砲塔・本体も含む）へ散弾5粒
+function droneAttackerFire(d) {
+  var bestT = null, bestD2 = DRONE_ATTACKER_RANGE * DRONE_ATTACKER_RANGE;
+  var i, dx, dy, d2;
+  for (i = 0; i < enemies.length; i++) {
+    var e = enemies[i];
+    if (e.dead) continue;
+    dx = e.x - d.x; dy = e.y - d.y; d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) { bestD2 = d2; bestT = { x: e.x, y: e.y }; }
+  }
+  if (boss && boss.phase !== "finish") {
+    for (i = 0; i < boss.turrets.length; i++) {
+      var tr = boss.turrets[i];
+      if (!tr.alive) continue;
+      dx = tr.x - d.x; dy = tr.y - d.y; d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; bestT = { x: tr.x, y: tr.y }; }
+    }
+    if (boss.phase === 2 || boss.phase === "exec") {
+      dx = boss.x - d.x; dy = boss.y - d.y; d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) { bestD2 = d2; bestT = { x: boss.x, y: boss.y }; }
+    }
+  }
+  if (!bestT) return;
+  var base = Math.atan2(bestT.y - d.y, bestT.x - d.x);
+  d.aim = base;
+  for (var pk = -2; pk <= 2; pk++) {
+    var a = base + pk * (DRONE_PELLET_SPREAD / 2);
+    bullets.push({
+      x: d.x + Math.cos(a) * 12, y: d.y + Math.sin(a) * 12,
+      vx: Math.cos(a) * DRONE_PELLET_SPEED, vy: Math.sin(a) * DRONE_PELLET_SPEED,
+      angle: a, r: 2.2, dmg: DRONE_PELLET_DMG,
+      pierce: false, gold: false, sizeMul: 0.7, hitUids: null,
+      drone: true, rangeLeft: DRONE_PELLET_RANGE
+    });
+  }
+}
+// ---- ドロップカプセル ----
+function spawnCapsule(x, y, role) {
+  capsules.push({ x: x, y: y, role: role, life: CAPSULE_LIFE, phase: rand(0, Math.PI * 2) });
+}
+function updateCapsules(dt) {
+  for (var i = capsules.length - 1; i >= 0; i--) {
+    var c = capsules[i];
+    c.life -= dt;
+    if (c.life <= 0) { capsules.splice(i, 1); continue; }
+    var dx = player.x - c.x, dy = player.y - c.y;
+    var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    if (dist < CAPSULE_MAGNET_R) {
+      // 近づくと吸い寄せられる（近いほど速く）
+      var sp = 210 + (CAPSULE_MAGNET_R - dist) * 9;
+      c.x += dx / dist * sp * dt; c.y += dy / dist * sp * dt;
+    }
+    if (dist < CAPSULE_PICKUP_R) {
+      pickupCapsule(c);
+      capsules.splice(i, 1);
+    }
+  }
+}
+function pickupCapsule(c) {
+  var role = c.role;
+  if (role === "random") role = DRONE_ROLE_ORDER[Math.floor(Math.random() * 3)];
+  if (droneCount(role) < DRONE_ROLES[role].max) {
+    addDrone(role);
+    if (popups.length >= MAX_POPUPS) popups.shift();
+    popups.push({ x: player.x, y: player.y - 26, text: DRONE_ROLES[role].name + " +1", life: 0.9, maxLife: 0.9, pop: 1, big: true, color: DRONE_ROLES[role].color });
+  } else {
+    // 上限の役割は代替報酬：+300点のみ（HP回復はなし）
+    score += CAPSULE_FALLBACK_SCORE;
+    if (popups.length >= MAX_POPUPS) popups.shift();
+    popups.push({ x: player.x, y: player.y - 26, text: "+" + CAPSULE_FALLBACK_SCORE, life: 0.9, maxLife: 0.9, pop: 1, big: true, color: "#e8f6ff" });
+  }
+  sfxPickup();
+  updateHud();
+}
+// ボス撃破報酬の子機+1：まだ持っていない役割を優先し、
+// 次に機数の少ない役割（同数なら attacker→guard→booster の順）。
+// 全役割が上限なら +1,000点。
+function grantBossDroneReward() {
+  var role = null, i, cnt;
+  for (i = 0; i < DRONE_ROLE_ORDER.length; i++) {
+    if (droneCount(DRONE_ROLE_ORDER[i]) === 0) { role = DRONE_ROLE_ORDER[i]; break; }
+  }
+  if (!role) {
+    var bestCnt = Infinity;
+    for (i = 0; i < DRONE_ROLE_ORDER.length; i++) {
+      cnt = droneCount(DRONE_ROLE_ORDER[i]);
+      if (cnt < DRONE_ROLES[DRONE_ROLE_ORDER[i]].max && cnt < bestCnt) { bestCnt = cnt; role = DRONE_ROLE_ORDER[i]; }
+    }
+  }
+  if (!role) {
+    score += BOSS_DRONE_FALLBACK_SCORE;
+    if (popups.length >= MAX_POPUPS) popups.shift();
+    popups.push({ x: player.x, y: player.y - 40, text: "+" + BOSS_DRONE_FALLBACK_SCORE, life: 1.0, maxLife: 1.0, pop: 1, big: true, color: "#e8f6ff" });
+    return;
+  }
+  addDrone(role);
+  if (popups.length >= MAX_POPUPS) popups.shift();
+  popups.push({ x: player.x, y: player.y - 40, text: DRONE_ROLES[role].name + " +1", life: 1.1, maxLife: 1.1, pop: 1, big: true, color: DRONE_ROLES[role].color });
+  sfxPickup();
+}
+
+/* ============================================================
    更新
    ============================================================ */
 function update(dt) {
@@ -701,6 +985,8 @@ function update(dt) {
   bossUpdate(dt);
   updateIceShots(dt);
   if (bossBarShatterT > 0) bossBarShatterT -= dt;
+  updateDrones(dt);
+  updateCapsules(dt);
 
   // 凍結エリアの寿命（残り時間を使い切ったら消える）
   for (var fi = frostZones.length - 1; fi >= 0; fi--) {
@@ -736,8 +1022,8 @@ function update(dt) {
   // 自機も凍結エリア内では遅くなる（弾の速さは変わらない）
   player.frosted = inFrost(player.x, player.y);
   if (moveVec) {
-    // オーバードライブ中は移動速度も少し上がる（約+25%）
-    var moveSpeed = PLAYER_SPEED * (odActive ? OD_MOVE_SPEED_MUL : 1);
+    // オーバードライブ中は移動速度も上がる（上昇量は発動時のブースター数で固定）
+    var moveSpeed = PLAYER_SPEED * (odActive ? odMoveMul : 1);
     if (player.frosted) moveSpeed *= FROST_SLOW;
     player.x = clamp(player.x + moveVec.x * moveSpeed * dt, player.r, WORLD_W - player.r);
     player.y = clamp(player.y + moveVec.y * moveSpeed * dt, player.r, WORLD_H - player.r);
@@ -756,15 +1042,15 @@ function update(dt) {
   }
   player.fireTimer -= dt;
   if (aim.firing && player.fireTimer <= 0) {
-    // オーバードライブ中は連射間隔がさらに約20%短くなる
-    player.fireTimer = FIRE_INTERVAL * (odActive ? OD_FIRE_INTERVAL_MUL : 1);
+    // オーバードライブ中は連射間隔が短くなる（短縮量は発動時のブースター数で固定）
+    player.fireTimer = FIRE_INTERVAL * (odActive ? odFireMul : 1);
     player.muzzle = 0.05; // 銃口フラッシュの表示時間
     var ca = Math.cos(player.angle), sa = Math.sin(player.angle);
     // ノズル：通常は左右2本、発動中は左右2対＝4本。
     // 進行方向と直角にずらした位置から同時に発射する。
     var px = -sa, py = ca;
-    var offsets = odActive ? OD_NOZZLE_OFFSETS : NOZZLE_OFFSETS;
-    var forwards = odActive ? OD_NOZZLE_FORWARD : NOZZLE_FORWARD;
+    var offsets = odActive ? odOffsets : NOZZLE_OFFSETS;
+    var forwards = odActive ? odForwards : NOZZLE_FORWARD;
     // 発動中は弾速3倍。端の弾は forwards が小さい分だけ後ろから出る
     var bulletSpeed = PLAYER_BULLET_SPEED * (odActive ? OD_BULLET_SPEED_MUL : 1);
     for (var ni = 0; ni < offsets.length; ni++) {
@@ -791,6 +1077,11 @@ function update(dt) {
     var b = bullets[i];
     b.px = b.x; b.py = b.y;
     b.x += b.vx * dt; b.y += b.vy * dt;
+    // 子機の散弾の粒は射程（飛距離）で消える
+    if (b.rangeLeft != null) {
+      b.rangeLeft -= Math.sqrt(b.vx * b.vx + b.vy * b.vy) * dt;
+      if (b.rangeLeft <= 0) b.dead = true;
+    }
     if (b.x < -20 || b.x > WORLD_W + 20 || b.y < -20 || b.y > WORLD_H + 20) b.dead = true;
   }
 
@@ -903,6 +1194,23 @@ function update(dt) {
   // 当たり判定：自機の弾 × ボス（砲塔・本体・バリア・処刑中の残骸）
   bossBulletCollisions();
 
+  // 当たり判定：敵弾 × 子機（稼働中の子機は体で弾を防ぐ。
+  // 機能停止中の子機は防げず、敵本体とは当たり判定なし＝すり抜ける）
+  for (i = enemyBullets.length - 1; i >= 0; i--) {
+    eb = enemyBullets[i];
+    if (eb.dead) continue;
+    for (var di2 = 0; di2 < drones.length; di2++) {
+      var dr = drones[di2];
+      if (dr.down) continue;
+      dx = eb.x - dr.x; dy = eb.y - dr.y; rr = DRONE_R + eb.r - 1;
+      if (dx * dx + dy * dy < rr * rr) {
+        eb.dead = true;
+        damageDrone(dr);
+        break;
+      }
+    }
+  }
+
   // 当たり判定：自機 × 敵弾 / 敵本体
   if (player.invincible <= 0) {
     var damaged = false;
@@ -986,6 +1294,7 @@ var el = {
   odNum: document.getElementById("od-num"),
   odWrap: document.getElementById("core-wrap"),
   odGlow: document.getElementById("od-glow"),
+  droneRow: document.getElementById("drone-row"),
   bossWrap: document.getElementById("boss-wrap"),
   bossFill: document.getElementById("boss-fill"),
   bossPhase: document.getElementById("boss-phase")
@@ -1006,7 +1315,7 @@ function updateHud() {
   if (pct !== hudCache.hp) {
     hudCache.hp = pct;
     el.hpFill.style.width = pct + "%";
-    el.hpNum.textContent = pct;
+    el.hpNum.textContent = Math.round(pct); // ガードのカットで小数のHPになるため表示は丸める
   }
   var band = pct <= 25 ? "low" : (pct <= 55 ? "mid" : "");
   if (band !== hudCache.band) { hudCache.band = band; el.hpFill.className = band; }
@@ -1017,7 +1326,7 @@ function updateHud() {
   // 画面の縁の金色グローもここで出し入れする。
   var odPct, odText, odMode;
   if (odActive) {
-    odPct = Math.round(odTimer / OD_DURATION * 100);
+    odPct = Math.round(odTimer / odDur * 100);
     odText = odTimer.toFixed(1) + "s";
     odMode = "active";
   } else {
@@ -1032,7 +1341,34 @@ function updateHud() {
     el.odWrap.className = odMode;
     el.odGlow.className = odActive ? "on" : "";
   }
+  updateDroneRow();
   updateBossBar();
+}
+// 子機HUD：HP／ODバーの下に、役割アイコン＋機数（×n）を小さく出す。
+// 機能停止中の機数はグレーで「停止×n」として添える。変化時のみDOM更新。
+var droneRowCache = "";
+var DRONE_ICONS = {
+  attacker: '<svg viewBox="-10 -10 20 20"><path d="M0 -7 L5.5 5 L-5.5 5 Z" fill="none" stroke="#ff8c1a" stroke-width="2.4"/></svg>',
+  guard: '<svg viewBox="-10 -10 20 20"><circle cx="0" cy="2" r="4.5" fill="none" stroke="#2d7bff" stroke-width="2.2"/><path d="M-7 -3 A7.6 7.6 0 0 1 7 -3" fill="none" stroke="#9fd0ff" stroke-width="3"/></svg>',
+  booster: '<svg viewBox="-10 -10 20 20"><circle cx="0" cy="0" r="5.5" fill="none" stroke="#ffc233" stroke-width="3.4"/></svg>'
+};
+function updateDroneRow() {
+  if (!el.droneRow) return;
+  var html = "";
+  for (var ri = 0; ri < DRONE_ROLE_ORDER.length; ri++) {
+    var role = DRONE_ROLE_ORDER[ri];
+    var cnt = 0, down = 0;
+    for (var i = 0; i < drones.length; i++) {
+      if (drones[i].role === role) { cnt++; if (drones[i].down) down++; }
+    }
+    if (cnt === 0) continue;
+    html += '<span class="drone-chip">' + DRONE_ICONS[role] + '<span class="drone-cnt">×' + cnt + '</span></span>';
+    if (down > 0) html += '<span class="drone-chip down">停止×' + down + '</span>';
+  }
+  if (html === droneRowCache) return;
+  droneRowCache = html;
+  el.droneRow.innerHTML = html;
+  el.droneRow.hidden = html === "";
 }
 // ボスバー：砲塔＋本体の残量合算を1本で示す。処刑突入時は砕ける演出を
 // 優先し、演出が終わったら隠す。値が変わった時だけDOMへ触る。
