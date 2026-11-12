@@ -196,6 +196,52 @@ var BOSS_EXEC_LIMIT = 12;        // 処刑フェイズでODタイマーを止め
 var BOSS_QUIET_TIME = 3.5;       // 撃破後の静けさ（通常湧き再開まで、秒）
 var BOSS_FINISH_FX_TIME = 0.8;   // 処刑完了時、大爆発の前に残骸の各所で小〜中爆発が連続する時間（秒）
 
+// ---- 子機（ドローン） ----
+// 役割ごとに複数機を所持できる（合計最大9機）。全機にHPがあり、
+// 敵弾を体で防ぐが、尽きると機能停止し10秒で復帰する。
+// OD発動の瞬間には全機が即座に全回復・復帰する。
+var DRONE_HP = 3;                 // 子機のHP（敵弾1発＝ダメージ1。素では3発で停止）
+var DRONE_REVIVE_TIME = 10;       // 機能停止から復帰までの時間（秒）
+var DRONE_R = 10;                 // 子機の当たり判定半径
+var DRONE_FOLLOW_FAST = 11;       // 追従イージング係数（アタッカー：素早い）
+var DRONE_FOLLOW_TAIL_SPEED = 620; // ブースターの尾行の最大速度
+// アタッカー（オレンジ小三角／スパイラルがドロップ）
+var DRONE_ATTACKER_MAX = 4;
+var DRONE_ATTACKER_DIST = 58;     // 斜め四隅の配置距離
+var DRONE_ATTACKER_INTERVAL = 0.45; // 1機あたりの射撃間隔（秒）
+var DRONE_ATTACKER_RANGE = 230;   // この距離内に敵がいるときだけ撃つ
+var DRONE_PELLETS = 5;            // 1射撃の粒数
+var DRONE_PELLET_SPREAD = 0.42;   // 散弾の広がり（rad、約±24°）
+var DRONE_PELLET_SPEED = 720;
+var DRONE_PELLET_RANGE = 180;     // 粒の射程（飛距離で消える）
+var DRONE_PELLET_DMG = 0.25;
+// ガード（青い小盾／ガーディアンがドロップ）
+var DRONE_GUARD_MAX = 2;
+var DRONE_GUARD_DIST = 62;        // 斜め後方の配置距離
+var DRONE_GUARD_SHIELD_R = 110;   // シールドの半径
+var DRONE_GUARD_CUT = 0.3;        // 圏内のガード1機につきダメージ30%カット
+var DRONE_GUARD_FOLLOW_SPEED = 283; // 追従の最大速度（自機の通常速度308より少し遅い）
+// ブースター（金の小リング／アンプがドロップ）
+var DRONE_BOOSTER_MAX = 3;
+var DRONE_BOOSTER_GAP = 30;       // 尾の間隔（px）
+// ドロップカプセル
+var CAPSULE_LIFE = 10;            // カプセルの寿命（秒）。残り3秒で点滅
+var CAPSULE_MAGNET_R = 70;        // 吸い寄せが始まる距離
+var CAPSULE_PICKUP_R = 26;        // 取得判定の距離（自機中心から）
+var CAPSULE_FALLBACK_SCORE = 300; // 上限の役割を拾った時の代替報酬（スコアのみ）
+var BOSS_DRONE_FALLBACK_SCORE = 1000; // ボス報酬で全役割上限の時の代替スコア
+
+// ---- オーバードライブ見直し（ブースター連動） ----
+// ゲージ獲得：基本は現行の0.8倍。稼働ブースター1機につき+0.2倍（最大1.4倍）。
+// 発動時間：8秒＋0.8秒×稼働ブースター数。ノズル：2＋稼働ブースター数。
+// 連射・移動の上昇量：0機では現行の半分、3機で現行どおり（線形補間）。
+// いずれも発動の瞬間の稼働ブースター数で固定される（ゲージ倍率のみ常時計算）。
+var OD_GAIN_BASE_MUL = 0.8;
+var OD_GAIN_PER_BOOSTER = 0.2;
+var OD_TIME_PER_BOOSTER = 0.8;
+var OD_FIRE_MUL_BASE = 0.9;       // ブースター0機：連射間隔×0.9（現行×0.8の半分の上昇）
+var OD_MOVE_MUL_BASE = 1.125;     // ブースター0機：移動+12.5%（現行+25%の半分）
+
 // ---- 演出の数値（衝撃波リング・シェイク） ----
 var RING_BASE_SPEED = 2600, RING_SPEED_PER_TIER = 800;  // 耐久1で2600、耐久3で3400
 var RING_BASE_WIDTH = 25, RING_WIDTH_PER_TIER = 10;     // 耐久1で太さ25、耐久3で35

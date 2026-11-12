@@ -88,6 +88,17 @@ function sfxBarrierDown() {
   tone(1200, 180, 0.35, "sawtooth", 0.07);
   noiseBurst(0.3, 2600, 0.09);
 }
+// 子機カプセルの取得：軽い2音で「増えた」ことを知らせる
+function sfxPickup() {
+  if (!soundOn || !audioCtx) return;
+  tone(880, 880, 0.07, "square", 0.06);
+  setTimeout(function () { tone(1318, 1318, 0.1, "square", 0.06); }, 60);
+}
+// 子機の機能停止：短い下降音
+function sfxDroneDown() {
+  if (!soundOn || !audioCtx) return;
+  tone(520, 160, 0.18, "triangle", 0.07);
+}
 function sfxGameOver() {
   tone(392, 392, 0.16, "square", 0.08);
   setTimeout(function () { tone(311, 311, 0.16, "square", 0.08); }, 170);

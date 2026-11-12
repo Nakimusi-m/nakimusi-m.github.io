@@ -54,6 +54,7 @@
           <div id="core-head"><span>HP<span id="hp-num">100</span></span><span class="core-od">OVERDRIVE<span id="od-num">0%</span></span></div>
           <div id="core-bar"><div id="hp-fill"></div><div id="od-fill"></div></div>
         </div>
+        <div id="drone-row" hidden></div>
         <div id="boss-wrap" hidden>
           <div id="boss-head"><span class="boss-name">PERMAFROST</span><span id="boss-phase">PHASE 1</span></div>
           <div id="boss-bar"><div id="boss-fill"></div></div>
@@ -68,7 +69,9 @@
           <li><span class="k">LEFT STICK</span>画面左半分をドラッグ ― 移動</li>
           <li><span class="k">RIGHT STICK</span>画面右半分をドラッグ ― その向きを向いて、傾けている間撃ち続ける</li>
           <li class="weapon-row"><span class="k">WEAPON</span>ツインノズル ― 弾を2本同時発射・連射速度2倍（1発のダメージは小さめ）</li>
-          <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 8秒間、弾が4本（端は少し後ろから）になり弾速3倍・貫通、自機も金色に加速</li>
+          <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 弾速3倍・貫通・ダメージ2倍。ブースター子機が多いほど長く続き、ノズルも2本→最大5本に増える</li>
+          <li class="drone-row"><span class="k">DRONE</span>子機カプセル：スパイラル→アタッカー（散弾・斜め四隅・最大4）／ガーディアン→ガード（シールドで被ダメージ30%カット／台・斜め後方・最大2）／アンプ→ブースター（OD強化・後ろに尾行・最大3）。タンクはランダム</li>
+          <li class="drone-row"><span class="k">DRONE HP</span>子機は敵弾を体で防ぐが3発で機能停止し、10秒で復帰。オーバードライブ発動で即全回復・復帰</li>
           <li class="pc-row"><span class="k">PC</span>WASD／矢印キーで移動、マウスで狙ってクリックで射撃</li>
           <li class="boss-row"><span class="k">BOSS</span>90秒ごとに要塞ボス「ペルマフロスト」出現 ― 砲塔を壊してバリアを割り、本体を倒すと処刑タイム。ボス戦中はゲージが貯まらない</li>
           <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
@@ -96,15 +99,15 @@
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="13" fill="none" stroke="#e8ecf2" stroke-width="3"/><circle cx="0" cy="0" r="6" fill="none" stroke="#e8ecf2" stroke-width="2"/></svg>
-            <figcaption>拡散弾 ・ 800</figcaption>
+            <figcaption>拡散弾 ・ 800 ・ ランダム子機</figcaption>
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><path d="M0 -14 L4 -4 L14 -4 L6 3 L9 13 L0 7 L-9 13 L-6 3 L-14 -4 L-4 -4 Z" fill="none" stroke="#ffd51f" stroke-width="2.5"/></svg>
-            <figcaption>回転弾幕 ・ 400</figcaption>
+            <figcaption>回転弾幕 ・ 400 ・ アタッカー</figcaption>
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><circle cx="0" cy="3" r="9" fill="none" stroke="#2d7bff" stroke-width="3"/><path d="M-13 -6 A14 14 0 0 1 13 -6" fill="none" stroke="#9fd0ff" stroke-width="4"/></svg>
-            <figcaption>正面ガード ・ 350</figcaption>
+            <figcaption>正面ガード ・ 350 ・ ガード子機</figcaption>
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="12" fill="none" stroke="#ff2a2a" stroke-width="3"/><circle cx="0" cy="0" r="4" fill="#ff2a2a"/></svg>
@@ -120,7 +123,7 @@
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/></svg>
-            <figcaption>支援 ・ 300</figcaption>
+            <figcaption>支援 ・ 300 ・ ブースター</figcaption>
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><polygon points="6,-14 14,-6 14,6 6,14 -6,14 -14,6 -14,-6 -6,-14" fill="none" stroke="#7fd8ff" stroke-width="3"/><circle cx="0" cy="0" r="3.5" fill="#7fd8ff"/></svg>

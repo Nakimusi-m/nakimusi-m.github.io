@@ -81,9 +81,13 @@ function fxHp(hp) { return clamp(hp, 0.25, 6); }
 // オーバードライブ発動：満タンの瞬間に自動で切り替わる。
 // 自機の周りに金色のリングと光を広げ、効果音でも知らせる。
 function activateOverdrive() {
+  // 発動の瞬間の稼働ブースター数で、その回の時間・ノズル数・上昇量を固定する
+  snapshotOverdrive();
   odActive = true;
-  odTimer = OD_DURATION;
+  odTimer = odDur;
   odGauge = 100;
+  // 発動の瞬間、全ての子機が即座にHP全回復し、機能停止中なら即復帰する
+  reviveAllDrones();
   spawnRing(player.x, player.y, "#ffc233", 3);
   burst(player.x, player.y, "#ffc233", 22);
   gridPulse = 1;
@@ -99,8 +103,18 @@ function killEnemy(e) {
   // ボス戦中は一切貯まらない（bossGaugeLocked は game.js。召喚ダーター
   // なども対象外で、満タンになるのはボス本体を倒し切った時だけ）。
   if (!odActive && !bossGaugeLocked()) {
-    odGauge += OD_GAIN[e.type] || 4;
+    // ゲージ獲得量：基本0.8倍＋稼働ブースター1機につき+0.2倍（常時計算）
+    odGauge += (OD_GAIN[e.type] || 4) * (OD_GAIN_BASE_MUL + OD_GAIN_PER_BOOSTER * activeBoosterCount());
     if (odGauge >= 100) activateOverdrive();
+  }
+  // 子機カプセルのドロップ（ボス戦中は発生しない）：
+  // スパイラル→アタッカー、ガーディアン→ガード、アンプ→ブースターは100%、
+  // タンクはランダム（白銀のカプセル、中身は拾うまで分からない）。
+  if (!boss) {
+    if (e.type === "spiral") spawnCapsule(e.x, e.y, "attacker");
+    else if (e.type === "guardian") spawnCapsule(e.x, e.y, "guard");
+    else if (e.type === "amp") spawnCapsule(e.x, e.y, "booster");
+    else if (e.type === "tank") spawnCapsule(e.x, e.y, "random");
   }
   var big = e.maxHp >= 3;
   // コンボ：短い間隔で倒し続けると伸びる（表示と音程のみ。スコア倍率は付けない）
@@ -259,6 +273,9 @@ function spawnSparks(x, y, color, n) {
 }
 
 function damagePlayer(amount) {
+  // ガード子機のシールド：自機が圏内にいる間、ガード1機につき30%カット
+  var cutMul = 1 - DRONE_GUARD_CUT * guardCoverCount(player.x, player.y);
+  if (cutMul < 1) amount = Math.round(amount * cutMul * 10) / 10;
   player.hp -= amount;
   player.invincible = PLAYER_INVINCIBLE_TIME;
   shake = 7;
