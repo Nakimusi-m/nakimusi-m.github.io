@@ -86,8 +86,7 @@ function activateOverdrive() {
   odActive = true;
   odTimer = odDur;
   odGauge = 100;
-  // 発動の瞬間、全ての子機が即座にHP全回復し、機能停止中なら即復帰する
-  reviveAllDrones();
+  // 子機はOD発動では回復しない（修理はカプセル取得時の修理ルールのみ）
   spawnRing(player.x, player.y, "#ffc233", 3);
   burst(player.x, player.y, "#ffc233", 22);
   gridPulse = 1;

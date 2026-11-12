@@ -198,37 +198,37 @@ var BOSS_FINISH_FX_TIME = 0.8;   // 処刑完了時、大爆発の前に残骸�
 
 // ---- 子機（ドローン） ----
 // 役割ごとに複数機を所持できる（合計最大9機）。全機にHPがあり、
-// 敵弾を体で防ぐが、尽きると機能停止し10秒で復帰する。
-// OD発動の瞬間には全機が即座に全回復・復帰する。
-var DRONE_HP = 3;                 // 子機のHP（敵弾1発＝ダメージ1。素では3発で停止）
-var DRONE_REVIVE_TIME = 10;       // 機能停止から復帰までの時間（秒）
+// 敵弾を体で防ぐが、尽きると機能停止し30秒で復帰する。
+// OD発動では回復しない（修理はカプセル取得時の修理ルールで）。
+var DRONE_HP = { attacker: 6, guard: 9, booster: 6 }; // 役割ごとのHP（敵弾1発＝ダメージ1。ガードは3倍、アタッカー／ブースターは従来の2倍）
+var DRONE_REVIVE_TIME = 30;       // 機能停止から復帰までの時間（秒）
 var DRONE_R = 10;                 // 子機の当たり判定半径
 var DRONE_FOLLOW_FAST = 11;       // 追従イージング係数（アタッカー：素早い）
-var DRONE_FOLLOW_TAIL_SPEED = 620; // ブースターの尾行の最大速度
+var DRONE_FOLLOW_TAIL_SPEED = 620; // ブースターの尾の追従の最大速度
 // アタッカー（オレンジ小三角／スパイラルがドロップ）
 var DRONE_ATTACKER_MAX = 4;
 var DRONE_ATTACKER_DIST = 58;     // 斜め四隅の配置距離
-var DRONE_ATTACKER_INTERVAL = 0.45; // 1機あたりの射撃間隔（秒）
-var DRONE_ATTACKER_RANGE = 230;   // この距離内に敵がいるときだけ撃つ
+var DRONE_ATTACKER_INTERVAL = 0.15; // 1機あたりの射撃間隔（秒。連射速度3倍）
+var DRONE_ATTACKER_RANGE = 380;   // この距離内に敵がいるときだけ撃つ（射程2倍に合わせて拡大）
 var DRONE_PELLETS = 5;            // 1射撃の粒数
 var DRONE_PELLET_SPREAD = 0.42;   // 散弾の広がり（rad、約±24°）
 var DRONE_PELLET_SPEED = 720;
-var DRONE_PELLET_RANGE = 180;     // 粒の射程（飛距離で消える）
+var DRONE_PELLET_RANGE = 360;     // 粒の射程（飛距離で消える。従来の2倍）
 var DRONE_PELLET_DMG = 0.25;
 // ガード（青い小盾／ガーディアンがドロップ）
 var DRONE_GUARD_MAX = 2;
-var DRONE_GUARD_DIST = 62;        // 斜め後方の配置距離
-var DRONE_GUARD_SHIELD_R = 110;   // シールドの半径
+var DRONE_GUARD_DIST = 40;        // 斜め後方の配置距離（アタッカーより内側）
+var DRONE_GUARD_SHIELD_R = 132;   // シールドの半径（従来の+20%）
 var DRONE_GUARD_CUT = 0.3;        // 圏内のガード1機につきダメージ30%カット
 var DRONE_GUARD_FOLLOW_SPEED = 283; // 追従の最大速度（自機の通常速度308より少し遅い）
 // ブースター（金の小リング／アンプがドロップ）
 var DRONE_BOOSTER_MAX = 3;
-var DRONE_BOOSTER_GAP = 30;       // 尾の間隔（px）
+var DRONE_BOOSTER_GAP = 30;       // 尾の間隔（px）。自機の向きの後ろ側に一列に連なる
 // ドロップカプセル
 var CAPSULE_LIFE = 10;            // カプセルの寿命（秒）。残り3秒で点滅
 var CAPSULE_MAGNET_R = 70;        // 吸い寄せが始まる距離
 var CAPSULE_PICKUP_R = 26;        // 取得判定の距離（自機中心から）
-var CAPSULE_FALLBACK_SCORE = 300; // 上限の役割を拾った時の代替報酬（スコアのみ）
+var CAPSULE_FALLBACK_SCORE = 300; // 満員かつ全機無傷の役割を拾った時の代替報酬（スコアのみ）
 var BOSS_DRONE_FALLBACK_SCORE = 1000; // ボス報酬で全役割上限の時の代替スコア
 
 // ---- オーバードライブ見直し（ブースター連動） ----
