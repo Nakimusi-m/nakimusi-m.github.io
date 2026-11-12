@@ -195,10 +195,13 @@ function bossGaugeLocked() { return !!(boss && boss.phase !== "exec"); }
 var particlePool = [], shardPool = [], ringPool = [], sparkPool = [];
 
 function computeDiff() {
-  // 経過時間で難易度を上げる（2分でほぼ上限）。数値は config.js の DIFF_* を参照
+  // 経過時間で難易度を上げる（敵速・割合は2分でほぼ上限）。
+  // 出現間隔だけは専用の緩やかなカーブ（DIFF_SPAWN_RAMP_TIME）で下げる：
+  // 180秒時点の出現量が従来カーブの約半分になる。数値は config.js の DIFF_* を参照
   var k = Math.min(elapsed / DIFF_RAMP_TIME, 1);
+  var sk = Math.min(elapsed / DIFF_SPAWN_RAMP_TIME, 1);
   diff = {
-    spawnInterval: DIFF_SPAWN_START - DIFF_SPAWN_DROP * k, // 0.92s → 0.34s
+    spawnInterval: DIFF_SPAWN_START - DIFF_SPAWN_DROP * sk, // 0.92s → 0.34s（緩やかに435秒かけて）
     speedMul: 1 + DIFF_SPEED_MUL_MAX * k,               // 敵速 +55%
     hexProb: DIFF_HEX_START + DIFF_HEX_GAIN * k,        // 射撃敵の割合増
     aimedProb: Math.min(elapsed / DIFF_AIMED_RAMP_TIME, 1) * DIFF_AIMED_MAX, // 自機狙いの割合増
@@ -258,7 +261,7 @@ function spawnBossBullet(x, y, angle, speed, dmg) {
 /* ============================================================
    ボス「ペルマフロスト」
    本体（八角形の氷の要塞）＋左右の大型砲塔2機の複合ボス。
-   第1段階：砲塔が拡散→チャージ→バーストのサイクル、本体はバリア無敵で氷結弾（3方向拡散）。
+   第1段階：砲塔が拡散→チャージ→バーストのサイクル、本体はバリア無敵で氷結弾（1発は自機位置へ正確に、2発は周囲へ散布）。
    第2段階：砲塔を両方壊すとバリアが割れ、回転弾幕＋低速突進＋氷結弾（間隔は短くなる）。
    本体を倒し切ると処刑フェイズ（機能停止した残骸をODで撃ち込む）。
    数値はすべて config.js の BOSS_* を参照する。
@@ -423,7 +426,7 @@ function bossUpdate(dt) {
       tr.modeTimer -= dt;
       if (tr.modeTimer <= 0) { tr.mode = "burst"; tr.burstLeft = BOSS_BURST_COUNT; tr.burstTimer = 0; }
     } else if (tr.mode === "burst") {
-      // バースト：各発を撃つ瞬間の自機位置へ狙い、速い弾を3連射
+      // バースト：各発を撃つ瞬間の自機位置へ狙い、高速弾を5連射
       tr.aim = base;
       tr.burstTimer -= dt;
       if (tr.burstTimer <= 0 && tr.burstLeft > 0) {
@@ -452,15 +455,26 @@ function bossUpdate(dt) {
   }
 
   // ---- 本体：氷結弾（両段階共通。着弾点に半径60%の凍結エリアを作る） ----
-  // 自機方向を中心に±20°へ3発拡散する。第1段階は遅めの間隔（6秒）で、
-  // 砲塔が無くなった第2段階でも止まらず、むしろ短い間隔（4秒）で撃ち続ける。
+  // 1回の発射で3発：1発は発射時点の自機位置へ正確に着弾し、残り2発は自機位置から
+  // ランダムな向きに130〜230px離れた点へ着弾する（2発の向きは互いに独立）。
+  // 第1段階は遅めの間隔（6秒）で、砲塔が無くなった第2段階でも止まらず、
+  // むしろ短い間隔（4秒）で撃ち続ける。
   b.iceTimer -= dt;
   if (b.iceTimer <= 0) {
     b.iceTimer = b.phase === 1 ? b.iceInterval : BOSS_ICE_P2_INTERVAL;
-    var iba = Math.atan2(player.y - b.y, player.x - b.x);
-    for (var io = -1; io <= 1; io++) {
-      var ia = iba + io * BOSS_ICE_SPREAD;
-      iceShots.push({ x: b.x, y: b.y, sx: b.x, sy: b.y, tx: b.x + Math.cos(ia) * dist, ty: b.y + Math.sin(ia) * dist, t: 0, dur: Math.max(dist / BOSS_ICE_SPEED, 0.25) });
+    var iceTargets = [{ x: player.x, y: player.y }];
+    for (var io = 0; io < 2; io++) {
+      var ira = rand(0, Math.PI * 2), ird = rand(BOSS_ICE_SCATTER_MIN, BOSS_ICE_SCATTER_MAX);
+      iceTargets.push({
+        x: clamp(player.x + Math.cos(ira) * ird, 20, WORLD_W - 20),
+        y: clamp(player.y + Math.sin(ira) * ird, 20, WORLD_H - 20)
+      });
+    }
+    for (var it = 0; it < iceTargets.length; it++) {
+      var tg = iceTargets[it];
+      var tdx = tg.x - b.x, tdy = tg.y - b.y;
+      var tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+      iceShots.push({ x: b.x, y: b.y, sx: b.x, sy: b.y, tx: tg.x, ty: tg.y, t: 0, dur: Math.max(tdist / BOSS_ICE_SPEED, 0.25) });
     }
     tone(300, 700, 0.18, "sine", 0.04);
   }
