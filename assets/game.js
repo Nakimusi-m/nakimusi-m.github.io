@@ -651,12 +651,35 @@ function updateHud() {
 var ovTitle = document.getElementById("ov-title");
 var ovOver = document.getElementById("ov-over");
 var ovPause = document.getElementById("ov-pause");
+var ovHowto = document.getElementById("ov-howto");
+var ovZukan = document.getElementById("ov-zukan");
+var ovSettings = document.getElementById("ov-settings");
+var hudEl = document.getElementById("hud");
+// HUDはタイトル画面では隠し、プレイ中だけ出す（タイトルをすっきり見せる）
+function syncHudVisibility() {
+  if (hudEl) hudEl.style.display = state === "title" ? "none" : "";
+}
+function hideAllPanels() {
+  ovHowto.hidden = true; ovZukan.hidden = true; ovSettings.hidden = true;
+}
 
 function startGame() {
   ensureAudio();
   resetGame();
   state = "playing";
+  settingsPaused = false;
   ovTitle.hidden = true; ovOver.hidden = true; ovPause.hidden = true;
+  hideAllPanels();
+  syncHudVisibility();
+}
+function goToTitle() {
+  settingsPaused = false;
+  hideAllPanels();
+  ovOver.hidden = true; ovPause.hidden = true;
+  state = "title";
+  resetGame();
+  ovTitle.hidden = false;
+  syncHudVisibility();
 }
 function gameOver() {
   state = "over";
@@ -687,10 +710,88 @@ function resumeGame() {
 document.getElementById("btn-start").addEventListener("click", startGame);
 document.getElementById("btn-retry").addEventListener("click", startGame);
 document.getElementById("btn-resume").addEventListener("click", resumeGame);
-document.getElementById("btn-pause").addEventListener("click", function () {
-  if (state === "playing") pauseGame();
-  else if (state === "paused") resumeGame();
+/* ============================================================
+   専用パネル（操作方法／敵図鑑／設定）
+   タイトル画面右下のボタンと、ゲーム中右上の歯車ボタンから開く。
+   設定パネルはタイトルとゲーム中で共通。ゲーム中に開いている間は
+   ゲームを一時停止し、閉じると再開する。
+   ============================================================ */
+document.getElementById("btn-open-howto").addEventListener("click", function () { ovHowto.hidden = false; });
+document.getElementById("btn-open-zukan").addEventListener("click", function () { ovZukan.hidden = false; });
+var panelClosers = document.querySelectorAll(".panel-close[data-close]");
+for (var pci = 0; pci < panelClosers.length; pci++) {
+  (function (btn) {
+    btn.addEventListener("click", function () {
+      document.getElementById(btn.getAttribute("data-close")).hidden = true;
+    });
+  })(panelClosers[pci]);
+}
+var settingsPaused = false; // 設定を開いたことで一時停止したかどうか
+function openSettings(fromGame) {
+  document.getElementById("settings-game-actions").hidden = !fromGame;
+  if (fromGame && state === "playing") {
+    state = "paused";
+    settingsPaused = true;
+    stickRelease(leftStick); stickRelease(rightStick);
+    mouseDown = false;
+  } else {
+    settingsPaused = false;
+  }
+  ovSettings.hidden = false;
+}
+function closeSettings() {
+  ovSettings.hidden = true;
+  if (settingsPaused && state === "paused") {
+    settingsPaused = false;
+    ensureAudio();
+    state = "playing";
+  }
+}
+document.getElementById("btn-open-settings-title").addEventListener("click", function () { openSettings(false); });
+document.getElementById("btn-settings").addEventListener("click", function () {
+  if (ovSettings.hidden) openSettings(state === "playing" || state === "paused");
+  else closeSettings();
 });
+document.getElementById("btn-close-settings").addEventListener("click", closeSettings);
+document.getElementById("btn-restart").addEventListener("click", function () { startGame(); });
+document.getElementById("btn-to-title").addEventListener("click", function () { goToTitle(); });
+// 設定タブ（音量／画面・その他）の切り替え
+function selectSettingsTab(name) {
+  var btns = document.querySelectorAll(".stab-btn");
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle("selected", btns[i].getAttribute("data-tab") === name);
+  }
+  document.getElementById("pane-volume").hidden = name !== "volume";
+  document.getElementById("pane-display").hidden = name !== "display";
+}
+var stabBtns = document.querySelectorAll(".stab-btn");
+for (var sti = 0; sti < stabBtns.length; sti++) {
+  (function (btn) {
+    btn.addEventListener("click", function () { selectSettingsTab(btn.getAttribute("data-tab")); });
+  })(stabBtns[sti]);
+}
+// 音量タブ：スライダーで masterVolume（audio.js）を調整し、ミュートもここで行う
+var volRange = document.getElementById("vol-range");
+var volValue = document.getElementById("vol-value");
+var btnMute = document.getElementById("btn-mute");
+function syncVolumeUi() {
+  var pct = Math.round(masterVolume * 100);
+  volRange.value = pct;
+  volValue.textContent = pct + "%";
+  btnMute.textContent = soundOn ? "サウンド：ON" : "サウンド：OFF（ミュート中）";
+}
+volRange.addEventListener("input", function () {
+  masterVolume = Number(volRange.value) / 100;
+  if (masterVolume > 0 && !soundOn) soundOn = true;
+  syncVolumeUi();
+});
+btnMute.addEventListener("click", function () {
+  soundOn = !soundOn;
+  if (soundOn) ensureAudio();
+  syncVolumeUi();
+});
+syncVolumeUi();
+syncHudVisibility();
 /* ============================================================
    難易度セレクタ（タイトル画面とリトライ画面の両方に置く）
    選択は両画面で同期する。プレイ中はどちらの画面も出ないため、
@@ -722,9 +823,10 @@ function isFullscreen() {
 }
 function updateFsIcon() {
   var fs = isFullscreen();
-  document.getElementById("ic-fs-expand").style.display = fs ? "none" : "";
-  document.getElementById("ic-fs-shrink").style.display = fs ? "" : "none";
-  document.getElementById("btn-fs").setAttribute("aria-label", fs ? "全画面を終了" : "全画面（横向き固定）");
+  var label = document.getElementById("fs-settings-label");
+  if (label) label.textContent = fs ? "全画面を終了" : "全画面にする（横向き固定）";
+  var btn = document.getElementById("btn-fs-settings");
+  if (btn) btn.setAttribute("aria-label", fs ? "全画面を終了" : "全画面（横向き固定）");
 }
 function lockLandscape() {
   try {
@@ -734,7 +836,7 @@ function lockLandscape() {
     }
   } catch (err) { /* 未対応端末では無視 */ }
 }
-// 右上のアイコンボタンと、タイトル画面の「全画面で遊ぶ」ボタンで共用
+// タイトル画面中央のボタンと、設定パネルのボタンで共用
 function toggleFullscreen() {
   if (isFullscreen()) {
     try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (err) {}
@@ -752,17 +854,11 @@ function toggleFullscreen() {
   if (result && result.then) result.then(lockLandscape, lockLandscape);
   else setTimeout(lockLandscape, 60);
 }
-document.getElementById("btn-fs").addEventListener("click", toggleFullscreen);
+document.getElementById("btn-fs-settings").addEventListener("click", toggleFullscreen);
 document.getElementById("btn-fs-title").addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", function () { updateFsIcon(); resize(); });
 document.addEventListener("webkitfullscreenchange", function () { updateFsIcon(); resize(); });
 
-document.getElementById("btn-sound").addEventListener("click", function () {
-  soundOn = !soundOn;
-  document.getElementById("ic-sound-on").style.display = soundOn ? "" : "none";
-  document.getElementById("ic-sound-off").style.display = soundOn ? "none" : "";
-  if (soundOn) ensureAudio();
-});
 document.addEventListener("visibilitychange", function () {
   if (document.hidden && state === "playing") pauseGame();
 });
