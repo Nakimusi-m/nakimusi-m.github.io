@@ -111,15 +111,30 @@ function draw() {
     ctx.restore();
   }
 
-  // ヒーラーの回復ビーム：緑の細い線＋回復先に小さな十字（寿命で薄れる）
+  // ヒーラーの回復ビーム：ギザギザの折れ線（稲妻状）＋回復先に小さな
+  // 十字（寿命で薄れる）。色は回復と分かる緑系のまま。中点は直線に
+  // 対して垂直にずらし、毎フレーム乱数でちらつかせて放電らしくする。
   for (i = 0; i < healBeams.length; i++) {
     var hb = healBeams[i];
     var ha = Math.max(hb.life / hb.maxLife, 0);
+    var hdx = hb.x2 - hb.x1, hdy = hb.y2 - hb.y1;
+    var hlen = Math.sqrt(hdx * hdx + hdy * hdy) || 1;
+    var hpx = -hdy / hlen, hpy = hdx / hlen;
+    var hsegs = 6, hpts = [];
+    for (var hs = 0; hs <= hsegs; hs++) {
+      var ht = hs / hsegs;
+      var hoff = (hs === 0 || hs === hsegs) ? 0 : rand(-5, 5);
+      hpts.push([hb.x1 + hdx * ht + hpx * hoff, hb.y1 + hdy * ht + hpy * hoff]);
+    }
     ctx.save();
     ctx.globalAlpha = ha * 0.85;
     ctx.strokeStyle = "#6dffb8";
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(hb.x1, hb.y1); ctx.lineTo(hb.x2, hb.y2); ctx.stroke();
+    ctx.lineJoin = "miter";
+    ctx.beginPath();
+    ctx.moveTo(hpts[0][0], hpts[0][1]);
+    for (hs = 1; hs < hpts.length; hs++) ctx.lineTo(hpts[hs][0], hpts[hs][1]);
+    ctx.stroke();
     ctx.lineWidth = 2.4;
     ctx.beginPath();
     ctx.moveTo(hb.x2 - 5, hb.y2); ctx.lineTo(hb.x2 + 5, hb.y2);
@@ -193,12 +208,13 @@ function draw() {
     ctx.restore();
   }
 
-  // ステッパーの残像（ゴースト）：本体より下に、薄く短時間だけ残す
+  // ステッパーの残像（ゴースト）：本体より下に残し、直線移動の軌跡を
+  // くっきり読み取れるよう、約0.5秒・やや濃いめに表示する
   for (i = 0; i < stepperGhosts.length; i++) {
     var gh = stepperGhosts[i];
     if (Math.abs(gh.x - camX) > VIEW_W / 2 + 40 || Math.abs(gh.y - camY) > VIEW_H / 2 + 40) continue;
     ctx.save();
-    ctx.globalAlpha = Math.max(gh.life / gh.maxLife, 0) * 0.32;
+    ctx.globalAlpha = Math.max(gh.life / gh.maxLife, 0) * 0.55;
     ctx.drawImage(gh.spr.c, gh.x - gh.spr.w / 2, gh.y - gh.spr.h / 2, gh.spr.w, gh.spr.h);
     ctx.restore();
   }

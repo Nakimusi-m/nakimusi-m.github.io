@@ -48,23 +48,35 @@ function buildEnemySprite(t, flash) {
       return;
     }
     if (t.shape === "healer") {
-      // ヒーラー：白緑の丸に十字の印
+      // ヒーラー：濃いマゼンタの体にトゲ状の縁取り＋黒い十字。
+      // 白緑の丸だった頃は味方（子機）に見えたため、色と縁の形で
+      // 「敵の支援役」と読める姿にした。十字のモチーフ自体は残し、
+      // 回復役であることは伝わるようにする。
+      var spikes = 12, hpts = [], hi2, ha2, hr2;
+      for (hi2 = 0; hi2 < spikes * 2; hi2++) {
+        ha2 = hi2 * Math.PI / spikes - Math.PI / 2;
+        hr2 = hi2 % 2 === 0 ? t.r * 1.04 : t.r * 0.8; // 外側のトゲと内側の谷を交互に
+        hpts.push([Math.cos(ha2) * hr2, Math.sin(ha2) * hr2]);
+      }
       g.shadowColor = t.color;
       g.shadowBlur = 14;
       g.lineWidth = 2.5;
       g.strokeStyle = main;
-      g.beginPath(); g.arc(0, 0, t.r * 0.92, 0, Math.PI * 2); g.stroke();
+      pathOn(g, hpts);
+      g.stroke();
       g.shadowBlur = 0;
       g.fillStyle = t.color;
-      g.globalAlpha = 0.16;
-      g.beginPath(); g.arc(0, 0, t.r * 0.92, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = 0.28;
+      pathOn(g, hpts);
+      g.fill();
       g.globalAlpha = 1;
-      g.strokeStyle = main;
-      g.lineWidth = 4;
+      // 黒い十字（被弾フラッシュ時も黒のままにして敵らしさを保つ）
+      g.strokeStyle = flash ? "#3a0d26" : "#180510";
+      g.lineWidth = 4.2;
       g.lineCap = "round";
       g.beginPath();
-      g.moveTo(0, -t.r * 0.52); g.lineTo(0, t.r * 0.52);
-      g.moveTo(-t.r * 0.52, 0); g.lineTo(t.r * 0.52, 0);
+      g.moveTo(0, -t.r * 0.5); g.lineTo(0, t.r * 0.5);
+      g.moveTo(-t.r * 0.5, 0); g.lineTo(t.r * 0.5, 0);
       g.stroke();
       return;
     }
