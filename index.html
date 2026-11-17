@@ -76,72 +76,8 @@
           <li class="boss-row"><span class="k">BOSS</span>90秒ごとに要塞ボス「ペルマフロスト」出現 ― 本体にも攻撃は通るが、砲塔が残るほど軽減される（2機でダメージ1/4・1機で1/2・0機で等倍）。砲塔を先に壊せば第2段階へ、残したまま本体を倒し切っても処刑タイムへ（その場合、残った砲塔は無力化され得点は入らない）。ボス戦中はゲージが貯まらない</li>
           <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
         </ul>
-        <div class="enemy-legend">
+        <div class="enemy-legend" id="enemy-legend">
           <p class="legend-note">敵図鑑 ― 耐久は通常弾（1発＝0.25ダメージ）換算の発数です</p>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><rect x="-11" y="-11" width="22" height="22" fill="none" stroke="#ff2d78" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">四角</span><span class="lg-stat">4発 ・ 100点</span><span class="lg-desc">まっすぐ追跡、射撃なし</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -14 L11 0 L0 14 L-11 0 Z" fill="none" stroke="#b26bff" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">菱形</span><span class="lg-stat">2発 ・ 150点</span><span class="lg-desc">揺れながら追跡、射撃なし</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M12 -7 L12 7 L0 14 L-12 7 L-12 -7 L0 -14 Z" fill="none" stroke="#ff4040" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">六角形</span><span class="lg-stat">12発 ・ 300点</span><span class="lg-desc">追跡しつつ射撃。自機狙い型は黄色リング付き</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -14 L12 10 L-12 10 Z" fill="none" stroke="#ff8c1a" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">ダーター</span><span class="lg-stat">2発 ・ 120点</span><span class="lg-desc">3体で出現、予告0.45秒のあと高速突進</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -13 L12 -4 L7 11 L-7 11 L-12 -4 Z" fill="none" stroke="#3dff7a" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">スプリッター</span><span class="lg-stat">16発 ・ 250点</span><span class="lg-desc">倒すと2体に分裂</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -11 L10 -3.4 L6 9 L-6 9 L-10 -3.4 Z" fill="none" stroke="#55ff8c" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">スプリッター 第1世代</span><span class="lg-stat">8発 ・ 150点</span><span class="lg-desc">さらに2体に分裂</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -9.5 L8.5 -3 L5 7.5 L-5 7.5 L-8.5 -3 Z" fill="none" stroke="#74ffab" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">スプリッター 第2世代</span><span class="lg-stat">4発 ・ 80点</span><span class="lg-desc">さらに2体に分裂</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="8" fill="none" stroke="#7dff9e" stroke-width="3"/></svg>
-            <figcaption><span class="lg-name">スプリットレット（最終）</span><span class="lg-stat">1発 ・ 50点</span><span class="lg-desc">分裂はここまで</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="13" fill="none" stroke="#e8ecf2" stroke-width="3"/><circle cx="0" cy="0" r="6" fill="none" stroke="#e8ecf2" stroke-width="2"/></svg>
-            <figcaption><span class="lg-name">タンク</span><span class="lg-stat">40発 ・ 800点</span><span class="lg-desc">3方向拡散弾、体力バー付き。倒すとランダムな子機カプセル</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -14 L4 -4 L14 -4 L6 3 L9 13 L0 7 L-9 13 L-6 3 L-14 -4 L-4 -4 Z" fill="none" stroke="#ffd51f" stroke-width="2.5"/></svg>
-            <figcaption><span class="lg-name">スパイラル</span><span class="lg-stat">12発 ・ 400点</span><span class="lg-desc">回転弾幕。倒すとアタッカーをドロップ</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="3" r="9" fill="none" stroke="#2d7bff" stroke-width="3"/><path d="M-13 -6 A14 14 0 0 1 13 -6" fill="none" stroke="#9fd0ff" stroke-width="4"/></svg>
-            <figcaption><span class="lg-name">ガーディアン</span><span class="lg-stat">8発 ・ 350点</span><span class="lg-desc">正面の盾で弾を防ぐ。倒すとガードをドロップ</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="12" fill="none" stroke="#ff2a2a" stroke-width="3"/><circle cx="0" cy="0" r="4" fill="#ff2a2a"/></svg>
-            <figcaption><span class="lg-name">ボマー</span><span class="lg-stat">8発 ・ 200点</span><span class="lg-desc">近づくと点滅して自爆（爆発半径130）</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -13 L2.7 -4.7 L11.3 -6.5 L5.5 0 L11.3 6.5 L2.7 4.7 L0 13 L-2.7 4.7 L-11.3 6.5 L-5.5 0 L-11.3 -6.5 L-2.7 -4.7 Z" fill="none" stroke="#7fd8ff" stroke-width="2.5"/></svg>
-            <figcaption><span class="lg-name">フロスター</span><span class="lg-stat">8発 ・ 200点</span><span class="lg-desc">自爆・撃墜どちらでも起爆し、凍結エリア（半径230・6秒・移動×0.45、ダメージなし）を残す</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><path d="M0 -15 L6 9 L0 3 L-6 9 Z" fill="none" stroke="#b6ff2e" stroke-width="2.5"/></svg>
-            <figcaption><span class="lg-name">スナイパー</span><span class="lg-stat">6発 ・ 250点</span><span class="lg-desc">間合い430、照準線0.75秒の予告のあと高速弾。倒すとスナイパー型子機をドロップ</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/></svg>
-            <figcaption><span class="lg-name">アンプ</span><span class="lg-stat">10発 ・ 300点</span><span class="lg-desc">2.8秒ごとにパルス（半径260）で周囲の敵を強化（移動+20%・3秒、ダメージ無効0.5秒）。倒すとブースターをドロップ</span></figcaption>
-          </figure>
-          <figure>
-            <svg viewBox="-20 -20 40 40"><polygon points="6,-14 14,-6 14,6 6,14 -6,14 -14,6 -14,-6 -6,-14" fill="none" stroke="#7fd8ff" stroke-width="3"/><circle cx="0" cy="0" r="3.5" fill="#7fd8ff"/></svg>
-            <figcaption><span class="lg-name">ボス《ペルマフロスト》</span><span class="lg-stat">本体HP60 ・ 砲塔HP30</span><span class="lg-desc">砲塔2機残存で被ダメージ×0.25、1機で×0.5、0機で×1.0。砲塔は各1,000点、処刑フェイズの残骸HP90、撃破で5,000点</span></figcaption>
-          </figure>
         </div>
         <div class="diff-select">
           <span class="diff-label">DIFFICULTY</span>
@@ -194,6 +130,8 @@
     <script src="assets/sprites.js"></script>
     <script src="assets/audio.js"></script>
     <script src="assets/fx.js"></script>
+    <script src="assets/boss.js"></script>
+    <script src="assets/drones.js"></script>
     <script src="assets/game.js"></script>
     <script src="assets/render.js"></script>
     <script src="assets/input.js"></script>
