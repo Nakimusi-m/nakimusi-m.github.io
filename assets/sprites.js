@@ -126,17 +126,20 @@ SPR.bulletGold = makeSprite(28, 40, function (g) { // オーバードライブ�
   g.arcTo(x, y, x + w, y, r);
   g.closePath(); g.fill();
 });
-SPR.pellet = makeSprite(20, 20, function (g) { // 子機アタッカーの散弾の粒（オレンジ）
-  g.shadowColor = "#ff8c1a"; g.shadowBlur = 8;
-  g.fillStyle = "#ffd9a8";
+SPR.pellet = makeSprite(20, 20, function (g) { // 子機アタッカーの散弾の粒（味方弾：淡いシアン〜白）
+  g.shadowColor = "#22e6ff"; g.shadowBlur = 8;
+  g.fillStyle = "#dffaff";
   g.beginPath(); g.arc(0, 0, 3, 0, Math.PI * 2); g.fill();
+  g.shadowBlur = 0;
+  g.fillStyle = "#ffffff";
+  g.beginPath(); g.arc(0, 0, 1.4, 0, Math.PI * 2); g.fill();
 });
-SPR.ebullet = makeSprite(38, 38, function (g) { // 敵弾
-  g.shadowColor = "#ff7a1a"; g.shadowBlur = 12;
-  g.fillStyle = "#ffb03a";
+SPR.ebullet = makeSprite(38, 38, function (g) { // 敵弾（敵弾共通：赤〜マゼンタ系。色だけで敵弾と分かるように統一）
+  g.shadowColor = "#ff2d78"; g.shadowBlur = 12;
+  g.fillStyle = "#ff3b6b";
   g.beginPath(); g.arc(0, 0, 4.5, 0, Math.PI * 2); g.fill();
   g.shadowBlur = 0;
-  g.fillStyle = "#fff3d6";
+  g.fillStyle = "#ffd6e2";
   g.beginPath(); g.arc(0, 0, 4.5 * 0.45, 0, Math.PI * 2); g.fill();
 });
 SPR.ring = makeSprite(24, 24, function (g) { // 自機狙い型の目印リング

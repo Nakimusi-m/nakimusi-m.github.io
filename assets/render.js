@@ -150,7 +150,7 @@ function draw() {
   // 自機の弾（向きに合わせて回転。発動中の弾は金色で大きく描く）
   for (i = 0; i < bullets.length; i++) {
     var b = bullets[i];
-    if (b.drone) { // 子機の散弾の粒（オレンジの小粒）
+    if (b.drone) { // 子機の散弾の粒（淡いシアン〜白の小粒＝味方弾）
       ctx.drawImage(SPR.pellet.c, b.x - SPR.pellet.w / 2, b.y - SPR.pellet.h / 2, SPR.pellet.w, SPR.pellet.h);
       continue;
     }
@@ -374,10 +374,29 @@ function drawBoss() {
     ctx.restore();
   }
 
-  // 砲塔（生きているものだけ）。砲身はスイング中の照準方向を向く
+  // 砲塔（生きているもの＋処刑フェイズで無力化された残骸）。
+  // 残骸の砲塔は暗く沈み、砲身は力なく垂れたまま光らない。
   for (i = 0; i < b.turrets.length; i++) {
     tr = b.turrets[i];
-    if (!tr.alive) continue;
+    if (!tr.alive && !tr.wreck) continue;
+    if (tr.wreck) {
+      ctx.save();
+      ctx.translate(tr.x + ox, tr.y + oy);
+      ctx.globalAlpha = flicker ? 0.4 : 0.75;
+      ctx.strokeStyle = "#5d7d94";
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, BOSS_TURRET_R, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = "rgba(127, 216, 255, 0.05)";
+      ctx.beginPath(); ctx.arc(0, 0, BOSS_TURRET_R, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = "rgba(120, 160, 190, 0.35)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, BOSS_TURRET_R * 0.55, 0, Math.PI * 2); ctx.stroke();
+      ctx.rotate(tr.aim + 0.7); // 力なく傾いた砲身
+      ctx.fillStyle = "#4a657c";
+      ctx.fillRect(6, -5, BOSS_TURRET_R + 14, 10);
+      ctx.restore();
+      continue;
+    }
     ctx.save();
     ctx.translate(tr.x + ox, tr.y + oy);
     ctx.shadowColor = "#7fd8ff";
@@ -469,16 +488,21 @@ function drawBoss() {
   }
   ctx.restore();
 
-  // バリア（第1段階のみ）：本体を覆う氷の殻。当たった直後は強く光る
+  // バリア（第1段階のみ）：本体を覆う氷の殻だが、無敵ではない。
+  // 砲塔が減るほど薄く・細く・弱々しく描く（2機＝濃い／1機＝半分ほど）。
+  // 本体へ当たった直後は強く光る。
   if (b.phase === 1) {
+    var aliveT = 0;
+    for (i = 0; i < b.turrets.length; i++) if (b.turrets[i].alive) aliveT++;
+    var barrierMul = aliveT >= 2 ? 1 : 0.48;
     ctx.save();
     ctx.translate(b.x, b.y);
-    var ba = 0.4 + 0.14 * Math.sin(b.t * 3) + (b.shieldFlash > 0 ? 0.45 : 0);
+    var ba = (0.4 + 0.14 * Math.sin(b.t * 3)) * barrierMul + (b.shieldFlash > 0 ? 0.45 * barrierMul : 0);
     ctx.strokeStyle = "rgba(170, 228, 255, " + Math.min(ba, 0.9) + ")";
-    ctx.lineWidth = b.shieldFlash > 0 ? 4 : 2.5;
+    ctx.lineWidth = (b.shieldFlash > 0 ? 4 : 2.5) * barrierMul + 0.4;
     ctx.beginPath(); ctx.arc(0, 0, b.r + 17, 0, Math.PI * 2); ctx.stroke();
     ctx.strokeStyle = "rgba(170, 228, 255, " + Math.min(ba * 0.6, 0.6) + ")";
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 5 * barrierMul + 0.5;
     ctx.setLineDash([30, 20]);
     ctx.lineDashOffset = -b.t * 34;
     ctx.beginPath(); ctx.arc(0, 0, b.r + 17, 0, Math.PI * 2); ctx.stroke();
@@ -537,6 +561,9 @@ function drawCapsules() {
 }
 
 // 子機：ガードのシールド（薄い円）を先に描き、本体を役割の形で描く。
+// 全子機共通の味方マーカーとして、細いシアンの円リング＋中心の白いコアを
+// 付ける（機能停止中はリングがグレーになる）。「シアンの輪＝味方」が
+// 一目で分かるようにし、敵のダーターと似たアタッカーとの区別にもなる。
 // 機能停止中はグレーで半透明になり、復帰までの円形ゲージを添える。
 function drawDrones() {
   var i, d;
@@ -553,6 +580,12 @@ function drawDrones() {
   }
   for (i = 0; i < drones.length; i++) {
     d = drones[i];
+    // 味方マーカー：細いリング（稼働時シアン／停止時グレー）
+    ctx.save();
+    ctx.strokeStyle = d.down ? "rgba(138, 151, 168, 0.75)" : "rgba(34, 230, 255, 0.85)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(d.x, d.y, 14.5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
     var col = d.down ? "#8a97a8" : DRONE_ROLES[d.role].color;
     ctx.save();
     ctx.translate(d.x, d.y);
@@ -582,6 +615,9 @@ function drawDrones() {
       ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, Math.PI * 2); ctx.fill();
     }
     ctx.shadowBlur = 0;
+    // 味方マーカーの中心：小さな白いコア（全子機共通）
+    ctx.fillStyle = d.down ? "#aeb9c6" : "#ffffff";
+    ctx.beginPath(); ctx.arc(0, 0, 1.9, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     // 傷ついた子機は上に小さなHPバー
     if (!d.down && d.hp < d.maxHp) {
