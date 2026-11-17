@@ -152,9 +152,14 @@ var BOSS_FIRST_TIME = 90;        // 初回登場（秒）。予告はこの3秒�
 var BOSS_INTERVAL = 120;         // 撃破後、次の登場までの間隔（秒）
 var BOSS_WARN_TIME = 3;          // WARNING予告の長さ（秒）
 var BOSS_BODY_R = 64;            // 本体の半径
-var BOSS_TURRET_R = 34;          // 砲塔の半径
+var BOSS_TURRET_R = 40;          // 砲塔の半径（当たりやすく拡大。従来34）
 var BOSS_TURRET_OFFSET = 104;    // 本体中心から砲塔中心までの距離
-var BOSS_CORE_HP = 60;           // 本体HP（第2段階で露出してから）
+var BOSS_CORE_HP = 60;           // 本体HP（第1段階から削れ、第2段階へ持ち越す）
+// 本体へのダメージ倍率：残っている砲塔の数で変わる（添字＝残存砲塔数）
+// 2機残存で×0.25、1機で×0.5、0機（第2段階）で×1.0。
+// 砲塔が残っていても本体を倒し切れる（HPの下限クランプは付けない）。
+// そのまま処刑フェイズへ移行し、残っていた砲塔は無力化される（得点なし）。
+var BOSS_BODY_DMG_MUL = [1.0, 0.5, 0.25];
 var BOSS_TURRET_HP = 30;         // 砲塔HP（各）
 var BOSS_EXEC_HP = 90;           // 処刑フェイズの裏HP
 var BOSS_HP_MUL = 1.25;          // 2回目以降、登場ごとにHPがこの倍率で増える
@@ -206,15 +211,16 @@ var DRONE_R = 10;                 // 子機の当たり判定半径
 var DRONE_FOLLOW_FAST = 11;       // 追従イージング係数（アタッカー：素早い）
 var DRONE_FOLLOW_TAIL_SPEED = 620; // ブースターの尾の追従の最大速度
 // アタッカー（オレンジ小三角／スパイラルがドロップ）
+// 全機とも散弾型で統一（前方・後方でタイプは変えない）。
 var DRONE_ATTACKER_MAX = 4;
 var DRONE_ATTACKER_DIST = 58;     // 斜め四隅の配置距離
-var DRONE_ATTACKER_INTERVAL = 0.15; // 1機あたりの射撃間隔（秒。連射速度3倍）
-var DRONE_ATTACKER_RANGE = 380;   // この距離内に敵がいるときだけ撃つ（射程2倍に合わせて拡大）
+var DRONE_ATTACKER_INTERVAL = 0.15; // 1機あたりの射撃間隔（秒）
+var DRONE_ATTACKER_RANGE = 330;   // この距離内に敵がいるときだけ撃つ（従来380から短縮）
 var DRONE_PELLETS = 5;            // 1射撃の粒数
 var DRONE_PELLET_SPREAD = 0.42;   // 散弾の広がり（rad、約±24°）
 var DRONE_PELLET_SPEED = 720;
-var DRONE_PELLET_RANGE = 360;     // 粒の射程（飛距離で消える。従来の2倍）
-var DRONE_PELLET_DMG = 0.25;
+var DRONE_PELLET_RANGE = 300;     // 粒の射程（飛距離で消える。従来360から短縮）
+var DRONE_PELLET_DMG = 0.125;     // 粒1発のダメージ（従来0.25の半分）
 // ガード（青い小盾／ガーディアンがドロップ）
 var DRONE_GUARD_MAX = 2;
 var DRONE_GUARD_DIST = 40;        // 斜め後方の配置距離（アタッカーより内側）
