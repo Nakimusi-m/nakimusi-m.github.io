@@ -150,8 +150,21 @@ function draw() {
   // 自機の弾（向きに合わせて回転。発動中の弾は金色で大きく描く）
   for (i = 0; i < bullets.length; i++) {
     var b = bullets[i];
-    if (b.drone) { // 子機の散弾の粒（淡いシアン〜白の小粒＝味方弾）
-      ctx.drawImage(SPR.pellet.c, b.x - SPR.pellet.w / 2, b.y - SPR.pellet.h / 2, SPR.pellet.w, SPR.pellet.h);
+    if (b.drone) { // 子機の弾（淡いシアン〜白＝味方弾）
+      if (b.snipe) { // スナイパーの狙撃弾：少し大きめの粒＋短い残光
+        ctx.save();
+        ctx.strokeStyle = "rgba(170, 245, 255, 0.55)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(b.x - b.vx * 0.028, b.y - b.vy * 0.028);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+        ctx.restore();
+        var pw = SPR.pellet.w * 1.5, ph = SPR.pellet.h * 1.5;
+        ctx.drawImage(SPR.pellet.c, b.x - pw / 2, b.y - ph / 2, pw, ph);
+      } else { // アタッカーの散弾の粒
+        ctx.drawImage(SPR.pellet.c, b.x - SPR.pellet.w / 2, b.y - SPR.pellet.h / 2, SPR.pellet.w, SPR.pellet.h);
+      }
       continue;
     }
     var bspr = b.gold ? SPR.bulletGold : SPR.bullet;
@@ -551,6 +564,10 @@ function drawCapsules() {
       ctx.beginPath(); ctx.arc(0, 0.5, 4.2, Math.PI * 0.95, Math.PI * 2.05); ctx.stroke();
       ctx.fillStyle = col;
       ctx.beginPath(); ctx.arc(0, 1, 2, 0, Math.PI * 2); ctx.fill();
+    } else if (c.role === "sniper") {
+      // 細長い菱形（他役割と形でも区別する）
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(3.4, 0); ctx.lineTo(0, 6); ctx.lineTo(-3.4, 0); ctx.closePath(); ctx.fill();
     } else { // booster
       ctx.strokeStyle = col;
       ctx.lineWidth = 3;
@@ -567,15 +584,37 @@ function drawCapsules() {
 // 機能停止中はグレーで半透明になり、復帰までの円形ゲージを添える。
 function drawDrones() {
   var i, d;
+  // スナイパーの照準線：発射までの間、目標へ細い線を引く
   for (i = 0; i < drones.length; i++) {
     d = drones[i];
-    if (d.role !== "guard" || d.down) continue;
+    if (d.role !== "sniper" || d.down) continue;
+    var ap = droneSniperAimPos(d);
+    if (!ap) continue;
+    ctx.save();
+    ctx.strokeStyle = "rgba(150, 255, 215, 0.5)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(ap.x, ap.y); ctx.stroke();
+    ctx.restore();
+  }
+  for (i = 0; i < drones.length; i++) {
+    d = drones[i];
+    if (d.role !== "guard" || d.down || d.shieldDown) continue; // 割れている間は泡なし
     ctx.save();
     ctx.fillStyle = "rgba(45, 123, 255, 0.05)";
     ctx.beginPath(); ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = "rgba(140, 190, 255, 0.26)";
+    ctx.strokeStyle = "rgba(140, 190, 255, " + (d.shieldFlash > 0 ? 0.75 : 0.26) + ")";
     ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, 0, Math.PI * 2); ctx.stroke();
+    // シールド残量ゲージ：縁に沿って、残っている割合だけ明るい円弧を引く
+    var sfrac = Math.max(d.shieldHp, 0) / DRONE_GUARD_SHIELD_HP;
+    if (sfrac > 0) {
+      ctx.strokeStyle = sfrac <= 0.3 ? "rgba(255, 120, 120, 0.9)" : "rgba(190, 228, 255, 0.85)";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, -Math.PI / 2, -Math.PI / 2 + sfrac * Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
   }
   for (i = 0; i < drones.length; i++) {
@@ -609,6 +648,14 @@ function drawDrones() {
       ctx.lineWidth = 3;
       ctx.lineCap = "round";
       ctx.beginPath(); ctx.arc(0, 0, 7.6, -Math.PI * 0.82, -Math.PI * 0.18); ctx.stroke();
+    } else if (d.role === "sniper") {
+      // 細長い菱形〜矢型（照準方向を向く）
+      ctx.rotate(d.aim);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(11, 0); ctx.lineTo(-3, 4.6); ctx.lineTo(-8, 0); ctx.lineTo(-3, -4.6); ctx.closePath(); ctx.stroke();
+      ctx.globalAlpha *= 0.18;
+      ctx.fill();
+      ctx.globalAlpha = d.down ? 0.45 : 1;
     } else { // booster：金の小リング
       ctx.lineWidth = 3.4;
       ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.stroke();
@@ -635,6 +682,17 @@ function drawDrones() {
       ctx.beginPath(); ctx.arc(d.x, d.y, 13, 0, Math.PI * 2); ctx.stroke();
       ctx.strokeStyle = "#d7e6f5";
       ctx.beginPath(); ctx.arc(d.x, d.y, 13, -Math.PI / 2, -Math.PI / 2 + prog * Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    // シールド再展開待ち：ガードの周りに復旧の円ゲージ（満ちたら再展開）
+    if (d.role === "guard" && d.shieldDown && !d.down) {
+      var sProg = 1 - Math.max(d.shieldRegenT, 0) / DRONE_GUARD_SHIELD_REGEN;
+      ctx.save();
+      ctx.strokeStyle = "rgba(140, 190, 255, 0.3)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(d.x, d.y, 19, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = "#9fd0ff";
+      ctx.beginPath(); ctx.arc(d.x, d.y, 19, -Math.PI / 2, -Math.PI / 2 + sProg * Math.PI * 2); ctx.stroke();
       ctx.restore();
     }
   }

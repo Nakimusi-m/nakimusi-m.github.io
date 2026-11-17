@@ -295,6 +295,27 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .sub-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .sub-btn:active { background: rgba(34, 230, 255, 0.18); }
+/* ---------- 難易度セレクタ（タイトル／リトライ画面） ---------- */
+.diff-select {
+  margin-top: 20px;
+  display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+}
+.diff-label {
+  font-family: Orbitron, monospace; font-size: 10px; letter-spacing: 0.24em; color: var(--text-dim);
+}
+.diff-btns { display: flex; gap: 6px; }
+.diff-btn {
+  min-height: 38px; padding: 0 16px;
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif; font-size: 13px; font-weight: 700;
+  color: var(--text-dim); background: rgba(8, 16, 36, 0.55);
+  border: 1px solid rgba(140, 180, 210, 0.35); border-radius: 3px; cursor: pointer;
+}
+.diff-btn:active { background: rgba(34, 230, 255, 0.18); }
+.diff-btn.selected {
+  color: #031018; background: var(--cyan); border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(34, 230, 255, 0.5);
+}
+.diff-note { font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; }
 .over-title {
   font-family: Orbitron, monospace; font-weight: 900; font-size: clamp(28px, 6vw, 42px);
   letter-spacing: 0.08em; color: #ff5d5d; margin: 0;
@@ -331,6 +352,9 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .big-btn { margin-top: 10px; min-height: 42px; font-size: 14px; }
   .btn-row { margin-top: 10px; }
   .sub-btn { min-height: 42px; font-size: 12px; padding: 0 16px; }
+  .diff-select { margin-top: 10px; gap: 8px; }
+  .diff-btn { min-height: 34px; font-size: 12px; padding: 0 12px; }
+  .diff-note { display: none; }
   .result-grid { margin-top: 10px; }
 }
 /* 縦持ちではステージの高さが画面幅の9/16（幅360pxなら約200px）
@@ -353,6 +377,9 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .howto .boss-row { display: none; }
   .icon-btn { width: 36px; height: 36px; min-height: 36px; }
   .btn-row { margin-top: 8px; gap: 8px; flex-wrap: nowrap; }
+  .diff-select { margin-top: 6px; gap: 6px; }
+  .diff-label { display: none; }
+  .diff-btn { min-height: 30px; font-size: 11px; padding: 0 10px; }
   .big-btn { min-height: 36px; font-size: 13px; padding: 0 24px; }
   .sub-btn { min-height: 36px; font-size: 11px; padding: 0 12px; white-space: nowrap; }
   .over-title { font-size: 26px; }
