@@ -30,8 +30,12 @@ function loop(ts) {
     // ヒットストップ中は世界を止めて描画だけ行う（一瞬の手応え）
     hitStop -= rawDt;
     draw();
+  } else if (state === "dying") {
+    updateDying(dt); // ゲームオーバーのスローモーション
+    draw();
   } else {
     if (state !== "paused") update(dt);
+    updateOverCount(rawDt);
     draw();
   }
 }

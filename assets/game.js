@@ -44,7 +44,7 @@ function spawnEnemy(typeName, x, y, headingDeg, opts) {
     spiralDir: Math.random() < 0.5 ? -1 : 1, // サイクロンの自転方向（公転方向とは独立にランダム）
     spiralAngle: rand(0, Math.PI * 2),
     shieldFlash: 0,
-    fuse: -1, blastDone: false,
+    fuse: -1, blastDone: false, beepT: 0,
     snipeState: null, snipeTimer: 0, snipeAngle: 0,
     buffTimer: 0, invulnTimer: 0, buffFrom: null, moveMul: 1, frosted: false,
     pulseT: 0, orbitDir: Math.random() < 0.5 ? -1 : 1,
@@ -157,6 +157,8 @@ function eliteUpgrade(baseType, eliteType) {
 // ---- 生成ディレクター：時間経過で少しずつ激しくなる ----
 var director = { timer: 0.6 };
 function directorUpdate(dt) {
+  // カウントイン中は敵を出さない
+  if (introT > 0) { director.timer = 0.5; return; }
   // ボス予告中・ボス戦中・撃破後の静けさの間は通常湧きを止める
   if (bossWarnT > 0 || boss || quietTimer > 0) { director.timer = 0.5; return; }
   director.timer -= dt;
@@ -230,7 +232,12 @@ function directorUpdate(dt) {
 /* ============================================================
    ゲーム状態
    ============================================================ */
-var state = "title"; // title | playing | paused | over
+var state = "title"; // title | playing | paused | dying | over
+// ---- 演出強化用ステート ----
+var introT = 0;       // スタート時のカウントイン残り（秒）。0より大きい間は敵が出ない
+var dyingT = 0;       // ゲームオーバー時のスローモーション残り（秒）
+var overCountT = -1;  // スコア・カウントアップの経過（-1=未開始）
+var engineAcc = 0;    // エンジン粒子の発生アキュムレータ
 // ---- 難易度（タイトル／リトライ画面でのみ変更でき、プレイ中は固定） ----
 var difficulty = "normal"; // デフォルトはノーマル
 // 現在の難易度の速度倍率（敵の移動速度と敵弾の速度にだけ掛かる）
@@ -302,6 +309,8 @@ function resetGame() {
   shards = []; rings = []; sparks = [];
   frostZones = [];
   healBeams = []; stepperGhosts = [];
+  pickupStreaks = []; damageDirT = 0; recordBannerT = 0; recordShown = false; arcCrackleT = 0;
+  introT = 0; dyingT = 0; overCountT = -1; engineAcc = 0;
   comboCount = 0; comboTimer = 0; comboPop = 0;
   hitStop = 0; gridPulse = 0; flashWhite = 0;
   odGauge = 0; odActive = false; odTimer = 0;
@@ -322,7 +331,9 @@ function resetGame() {
 function makeStars() {
   stars = [];
   for (var i = 0; i < 240; i++) {
-    stars.push({ x: Math.random() * WORLD_W, y: Math.random() * WORLD_H, s: rand(0.6, 2.1) });
+    // パララックス係数：半分は遠層（0.55・小さく暗く）、半分は近層（0.85）
+    var far = i % 2 === 0;
+    stars.push({ x: Math.random() * WORLD_W, y: Math.random() * WORLD_H, s: far ? rand(0.6, 1.2) : rand(1.2, 2.1), par: far ? 0.55 : 0.85 });
   }
 }
 
@@ -340,6 +351,7 @@ function spawnEnemyBullet(x, y, dx, dy, speed, dmg) {
 function update(dt) {
   if (state !== "playing") { updateFx(dt); return; }
 
+  if (introT > 0) introT -= dt;
   elapsed += dt;
   computeDiff();
   bossDirector(dt);
@@ -389,6 +401,11 @@ function update(dt) {
     if (player.frosted) moveSpeed *= FROST_SLOW;
     player.x = clamp(player.x + moveVec.x * moveSpeed * dt, player.r, WORLD_W - player.r);
     player.y = clamp(player.y + moveVec.y * moveSpeed * dt, player.r, WORLD_H - player.r);
+    // エンジン粒子：移動中だけ、進行方向と逆へ小さな光を出す（OD中は金色）
+    engineAcc += dt * ENGINE_PARTICLE_RATE;
+    while (engineAcc >= 1) { engineAcc -= 1; spawnEngineParticle(moveVec.x, moveVec.y); }
+  } else {
+    engineAcc = 0;
   }
 
   // ---- 旋回と射撃：右スティック or マウス ----
@@ -479,8 +496,17 @@ function update(dt) {
     // ボマー／フロスターの起爆：近づくと点滅カウントダウンのあと起爆
     // （スコアは入らない）。ボマーは範囲ダメージ、フロスターは凍結エリア。
     if ((e.type === "bomber" || e.type === "froster") && !e.dead) {
-      if (e.fuse < 0 && distP < BOMBER_TRIGGER_DIST) e.fuse = BOMBER_FUSE_TIME;
+      if (e.fuse < 0 && distP < BOMBER_TRIGGER_DIST) { e.fuse = BOMBER_FUSE_TIME; e.beepT = 0; }
       if (e.fuse >= 0) {
+        // ボマーの爆破予告音：残り時間が減るほどビープ間隔が速くなり、点滅と同期する
+        if (e.type === "bomber") {
+          e.beepT -= dt;
+          if (e.beepT <= 0) {
+            var bprog = clamp(1 - e.fuse / BOMBER_FUSE_TIME, 0, 1);
+            sfxBomberBeep(bprog);
+            e.beepT = 0.42 + (0.11 - 0.42) * bprog; // 0.42秒→0.11秒へ加速
+          }
+        }
         e.fuse -= dt;
         if (e.fuse <= 0) {
           e.dead = true;
@@ -515,6 +541,20 @@ function update(dt) {
       se.x = se.bx; se.y = se.by;
       so.x = so.bx; so.y = so.by;
     }
+  }
+
+  // アークの電気音：最も近いアークが範囲内にいる間だけ、間引いて小さく鳴らす
+  arcCrackleT -= dt;
+  if (arcCrackleT <= 0) {
+    var arcNearest = Infinity;
+    for (i = 0; i < enemies.length; i++) {
+      if (enemies[i].type !== "arc" || enemies[i].dead) continue;
+      var adx = enemies[i].x - player.x, ady = enemies[i].y - player.y;
+      var ad = Math.sqrt(adx * adx + ady * ady);
+      if (ad < arcNearest) arcNearest = ad;
+    }
+    if (arcNearest < ARC_CRACKLE_RANGE) sfxArcCrackle(arcNearest);
+    arcCrackleT = rand(ARC_CRACKLE_INTERVAL[0], ARC_CRACKLE_INTERVAL[1]);
   }
 
   // 敵の弾
@@ -628,7 +668,7 @@ function update(dt) {
       dx = eb.x - player.x; dy = eb.y - player.y; rr = player.r + eb.r - 2;
       if (dx * dx + dy * dy < rr * rr) {
         eb.dead = true;
-        damagePlayer(eb.dmg || ENEMY_BULLET_DMG); // 通常弾-10、拡散弾・回転弾幕は-5
+        damagePlayer(eb.dmg || ENEMY_BULLET_DMG, eb.x, eb.y); // 通常弾-10、拡散弾・回転弾幕は-5
         damaged = true;
         break;
       }
@@ -649,11 +689,11 @@ function update(dt) {
             e.dead = true;
             spawnShards(e);
             frosterBlast(e);
-            damagePlayer(CONTACT_DMG);
+            damagePlayer(CONTACT_DMG, e.x, e.y);
           } else {
             burst(e.x, e.y, e.color, 12);
             e.dead = true;
-            damagePlayer(CONTACT_DMG);
+            damagePlayer(CONTACT_DMG, e.x, e.y);
           }
           break;
         }
@@ -667,7 +707,7 @@ function update(dt) {
       for (var li = 0; li < links.length; li++) {
         var la = links[li][0], lb = links[li][1];
         if (distToSegment(player.x, player.y, la.x, la.y, lb.x, lb.y) < player.r + 3) {
-          damagePlayer(ARC_ELEC_DMG);
+          damagePlayer(ARC_ELEC_DMG, (la.x + lb.x) / 2, (la.y + lb.y) / 2);
           damaged = true;
           break;
         }
@@ -677,13 +717,13 @@ function update(dt) {
     if (!damaged && boss && boss.phase !== "exec" && boss.phase !== "finish" && player.invincible <= 0) {
       var bdx = boss.x - player.x, bdy = boss.y - player.y, brr = player.r + boss.r - 3;
       if (bdx * bdx + bdy * bdy < brr * brr) {
-        damagePlayer(CONTACT_DMG);
+        damagePlayer(CONTACT_DMG, boss.x, boss.y);
       } else {
         for (var bti = 0; bti < boss.turrets.length; bti++) {
           var btr = boss.turrets[bti];
           if (!btr.alive) continue;
           var tdx = btr.x - player.x, tdy = btr.y - player.y, trr = player.r + BOSS_TURRET_R - 3;
-          if (tdx * tdx + tdy * tdy < trr * trr) { damagePlayer(CONTACT_DMG); break; }
+          if (tdx * tdx + tdy * tdy < trr * trr) { damagePlayer(CONTACT_DMG, btr.x, btr.y); break; }
         }
       }
     }
@@ -741,7 +781,7 @@ function updateHud() {
   }
   var band = pct <= 25 ? "low" : (pct <= 55 ? "mid" : "");
   if (band !== hudCache.band) { hudCache.band = band; el.hpFill.className = band; }
-  var low = state === "playing" && pct <= 25;
+  var low = state === "playing" && pct <= LOW_HP_THRESHOLD;
   if (low !== hudCache.low) { hudCache.low = low; stage.classList.toggle("lowhp", low); }
   // オーバードライブ：充電中は貯まり具合（%）を表示し、満タンが
   // 近づくと明滅。発動中はゲージが残り時間表示に切り替わり、
@@ -788,6 +828,7 @@ function startGame() {
   ensureAudio();
   resetGame();
   state = "playing";
+  introT = INTRO_TIME; // READY→GO のカウントイン（この間は敵が出ない）
   settingsPaused = false;
   ovTitle.hidden = true; ovOver.hidden = true; ovPause.hidden = true;
   hideAllPanels();
@@ -803,17 +844,45 @@ function goToTitle() {
   syncHudVisibility();
 }
 function gameOver() {
-  state = "over";
+  // まず約0.8秒のスローモーションで自機が砕ける演出（dying）に入り、
+  // 終わってから結果パネルを出す（showGameOverPanel）
+  state = "dying";
+  dyingT = DYING_TIME;
   odActive = false; odTimer = 0; odGauge = 0; // 金色グロー等を残さない
   stickRelease(leftStick); stickRelease(rightStick);
+  burst(player.x, player.y, "#22e6ff", 18);
+  spawnRing(player.x, player.y, "#22e6ff", 2);
+  shake = Math.max(shake, 14);
+  updateHud();
+}
+// スローモーション中の更新：演出オブジェクトだけをゆっくり進める
+function updateDying(dt) {
+  if (state !== "dying") return;
+  dyingT -= dt;
+  updateFx(dt * DYING_SCALE);
+  if (shake > 0) { shake *= Math.exp(-7.5 * dt); if (shake < 0.15) shake = 0; }
+  if (dyingT <= 0) showGameOverPanel();
+}
+function showGameOverPanel() {
+  state = "over";
   var isRecord = score > best;
   if (isRecord) best = score;
-  document.getElementById("final-score").textContent = score;
+  document.getElementById("final-score").textContent = "0"; // カウントアップで最終スコアまで
+  overCountT = 0;
   document.getElementById("final-best").textContent = best;
   document.getElementById("final-time").textContent = fmtTime(elapsed);
   document.getElementById("new-record").hidden = !isRecord;
   ovOver.hidden = false;
   updateHud();
+}
+// 結果パネルのスコア・カウントアップ（main.js のループから毎フレーム呼ばれる）
+function updateOverCount(dt) {
+  if (overCountT < 0 || state !== "over") return;
+  overCountT += dt;
+  var k = Math.min(overCountT / OVER_COUNT_TIME, 1);
+  var eased = 1 - (1 - k) * (1 - k);
+  document.getElementById("final-score").textContent = Math.round(score * eased);
+  if (k >= 1) overCountT = -1;
 }
 function pauseGame() {
   if (state !== "playing") return;

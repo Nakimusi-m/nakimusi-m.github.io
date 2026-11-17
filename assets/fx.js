@@ -11,6 +11,14 @@
 // プール化はせず、寿命で除去するだけに留める（上限は発生側で抑える）。
 var healBeams = [];
 var stepperGhosts = [];
+// カプセル取得時の光の筋 {x1,y1,life,maxLife,color}：取得位置から自機へ吸い込まれる
+var pickupStreaks = [];
+// 被弾方向表示：最後に当たった方向（自機→発生源の角度）と残り表示時間
+var damageDirAngle = 0, damageDirT = 0;
+// ゲーム中のベスト更新バナー
+var recordBannerT = 0, recordShown = false;
+// アークの電気音の間引きタイマ
+var arcCrackleT = 0;
 // ステッパーの残像を1つ残す（上限内でのみ。スプライトは敵のものを共用）
 function spawnStepperGhost(e) {
   if (stepperGhosts.length >= STEPPER_GHOST_MAX) return;
@@ -81,6 +89,12 @@ function updateFx(dt) {
     stepperGhosts[i].life -= dt;
     if (stepperGhosts[i].life <= 0) stepperGhosts.splice(i, 1);
   }
+  for (i = pickupStreaks.length - 1; i >= 0; i--) {
+    pickupStreaks[i].life -= dt;
+    if (pickupStreaks[i].life <= 0) pickupStreaks.splice(i, 1);
+  }
+  if (damageDirT > 0) damageDirT -= dt;
+  if (recordBannerT > 0) recordBannerT -= dt;
   // コンボの残り時間・ポップ、グリッド脈動、マズルの減衰
   if (state === "playing") {
     if (comboTimer > 0) {
@@ -144,13 +158,15 @@ function killEnemy(e) {
     }
   }
   var big = e.maxHp >= 3;
+  var isBigKill = !!BIG_KILL_TYPES[e.type]; // タンク・上位種3体
   // コンボ：短い間隔で倒し続けると伸びる（表示と音程のみ。スコア倍率は付けない）
   comboCount = comboTimer > 0 ? comboCount + 1 : 1;
   comboTimer = COMBO_WINDOW;
   comboPop = 1;
-  // 撃破演出：形・色の破片、光の粉、衝撃波リング、火花
-  spawnShards(e);
-  burst(e.x, e.y, e.color, big ? 20 : 12);
+  // 撃破演出：形・色の破片、光の粉、衝撃波リング、火花。
+  // 破片は敵の色に合わせ、オーバードライブ中の撃破は金色にする。
+  spawnShards(e, odActive ? "#ffc233" : null);
+  burst(e.x, e.y, odActive ? "#ffc233" : e.color, big ? 20 : 12);
   spawnRing(e.x, e.y, e.color, e.maxHp);
   spawnSparks(e.x, e.y, e.color, big ? 7 : 4);
   gridPulse = 1; // 背景グリッドが脈打つ
@@ -158,7 +174,11 @@ function killEnemy(e) {
   // それ以上は比例で伸ばすが上限を抑える。
   var shakeHp = clamp(e.maxHp, 0.25, 5);
   shake = Math.max(shake, SHAKE_HP1 + (shakeHp - 1) * (SHAKE_HP3 - SHAKE_HP1) / 2);
-  if (big) {
+  if (isBigKill) {
+    // 大きな敵：小さな衝撃波（白い輪）＋短いヒットストップ
+    hitStop = BIG_KILL_HITSTOP;
+    spawnRing(e.x, e.y, "#ffffff", 2);
+  } else if (big) {
     hitStop = e.maxHp >= 10 ? 0.08 : 0.06; // 一瞬だけ時を止める
   }
   if (popups.length >= MAX_POPUPS) popups.shift();
@@ -166,7 +186,14 @@ function killEnemy(e) {
     x: e.x, y: e.y - 8, text: "+" + e.score,
     life: 0.8, maxLife: 0.8, pop: 1, big: big, color: e.color
   });
-  sfxExplosion(big);
+  // 撃破音は大きさで3段階（小=高く軽く／中／大・上位種=低く重く）
+  sfxExplosionTier(isBigKill || e.maxHp >= 6 ? 2 : (e.maxHp >= 2 ? 1 : 0));
+  // ゲーム中のベスト更新：ベスト（前回記録）を超えた瞬間に一度だけ知らせる
+  if (!recordShown && best > 0 && score > best && state === "playing") {
+    recordShown = true;
+    recordBannerT = RECORD_BANNER_TIME;
+    sfxFanfare();
+  }
   // 分裂：世代制。親→子→孫→ひ孫（splitlet）まで2体ずつに分かれ、
   // ひ孫で終わる。子は親の位置に重ねず、自機方向と直角の両側へ
   // 34pxずつ離して出し、外向きの押し出しも付けて団子にならないようにする。
@@ -243,14 +270,14 @@ function bomberBlast(e) {
   var pdx = player.x - e.x, pdy = player.y - e.y;
   if (state === "playing" && player.invincible <= 0 &&
       pdx * pdx + pdy * pdy <= (BOMBER_RADIUS + player.r) * (BOMBER_RADIUS + player.r)) {
-    damagePlayer(BOMBER_PLAYER_DMG);
+    damagePlayer(BOMBER_PLAYER_DMG, e.x, e.y);
   }
   shake = Math.max(shake, 18);
   sfxExplosion(true);
 }
 
-// 敵の形・色そのままの破片になって砕け散る
-function spawnShards(e) {
+// 敵の形・色そのままの破片になって砕け散る（colorOverride があればその色で）
+function spawnShards(e, colorOverride) {
   var n = e.maxHp >= 3 ? 8 : 6;
   for (var i = 0; i < n; i++) {
     if (shards.length >= MAX_SHARDS) return;
@@ -265,7 +292,7 @@ function spawnShards(e) {
     // 係数は耐久1で1.0、耐久3で1.2（既存の見た目がほぼ変わらない範囲）、
     // 耐久10でも上限側（体力6相当）で抑える。
     s.size = rand(e.r * 0.3, e.r * 0.55) * SHARD_SIZE_MUL * (0.9 + 0.1 * fxHp(e.maxHp));
-    s.shape = e.shape; s.color = e.color;
+    s.shape = e.shape; s.color = colorOverride || e.color;
     shards.push(s);
   }
 }
@@ -299,12 +326,17 @@ function spawnSparks(x, y, color, n) {
   }
 }
 
-function damagePlayer(amount) {
+// srcX/srcY はダメージの発生源（任意）。渡されれば被弾方向の弧を出す。
+function damagePlayer(amount, srcX, srcY) {
   // ガード子機のシールド：自機が圏内にいる間、ガード1機につき30%カット
   var cutMul = 1 - DRONE_GUARD_CUT * guardCoverCount(player.x, player.y);
   if (cutMul < 1) amount = Math.round(amount * cutMul * 10) / 10;
   player.hp -= amount;
   player.invincible = PLAYER_INVINCIBLE_TIME;
+  if (srcX != null && srcY != null) {
+    damageDirAngle = Math.atan2(srcY - player.y, srcX - player.x);
+    damageDirT = DMG_ARC_TIME;
+  }
   shake = 7;
   sfxHit();
   if (player.hp <= 0) {
@@ -314,6 +346,31 @@ function damagePlayer(amount) {
     gameOver();
   }
   updateHud();
+}
+
+// 上昇する粒子（子機の復帰演出用）。上限内でのみ出す
+function burstRising(x, y, color, n) {
+  for (var i = 0; i < n; i++) {
+    if (particles.length >= MAX_PARTICLES) return;
+    var p = obtain(particlePool);
+    p.x = x + rand(-9, 9); p.y = y + rand(-6, 6);
+    p.vx = rand(-16, 16); p.vy = rand(-95, -45);
+    p.life = rand(0.35, 0.6); p.maxLife = 0.6;
+    p.size = rand(1.5, 3); p.color = color;
+    particles.push(p);
+  }
+}
+// エンジン粒子：移動中、進行方向と逆へ小さな光を1つ出す（呼び出し側で間引く）
+function spawnEngineParticle(mx, my) {
+  if (particles.length >= MAX_PARTICLES) return;
+  var p = obtain(particlePool);
+  var back = Math.atan2(-my, -mx) + rand(-0.35, 0.35);
+  var sp = rand(45, 95);
+  p.x = player.x + Math.cos(back) * 13; p.y = player.y + Math.sin(back) * 13;
+  p.vx = Math.cos(back) * sp; p.vy = Math.sin(back) * sp;
+  p.life = rand(0.22, 0.38); p.maxLife = 0.38;
+  p.size = rand(1.4, 2.8); p.color = odActive ? "#ffc233" : "#22e6ff";
+  particles.push(p);
 }
 
 function burst(x, y, color, n) {
