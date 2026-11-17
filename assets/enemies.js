@@ -113,21 +113,21 @@ var ENEMY_TYPES = {
     movement: "drift", attack: "pulse", speed: [70, 88], rotMode: "spin",
     fireInterval: [2.8, 2.8] // パルスの間隔（AMP_PULSE_INTERVAL と同値）
   },
-  healer: { // ヒーラー：白緑の丸に十字。距離を保ちながら、1秒ごとに近くの味方を回復する支援型
-    shape: "healer", color: "#6dffb8", r: 16, hp: 2.5, score: 350,
+  healer: { // ヒーラー：濃いマゼンタのトゲ状の縁取り＋黒い十字。距離を保ちながら、1秒ごとに近くの味方を回復する支援型
+    shape: "healer", color: "#c2187a", r: 16, hp: 2.5, score: 350,
     name: "ヒーラー", desc: "自機と距離を保ち、1秒ごとに周囲280pxで最も近い味方を最大5体、最大HPの20%回復する",
-    icon: '<circle cx="0" cy="0" r="11" fill="none" stroke="#6dffb8" stroke-width="3"/><path d="M0 -6.5 V6.5 M-6.5 0 H6.5" fill="none" stroke="#6dffb8" stroke-width="3.4"/>',
+    icon: '<path d="M0 -13 L2.7 -10.1 L6.5 -11.3 L7.4 -7.4 L11.3 -6.5 L10.1 -2.7 L13 0 L10.1 2.7 L11.3 6.5 L7.4 7.4 L6.5 11.3 L2.7 10.1 L0 13 L-2.7 10.1 L-6.5 11.3 L-7.4 7.4 L-11.3 6.5 L-10.1 2.7 L-13 0 L-10.1 -2.7 L-11.3 -6.5 L-7.4 -7.4 L-6.5 -11.3 L-2.7 -10.1 Z" fill="none" stroke="#c2187a" stroke-width="2.6"/><path d="M0 -5.5 V5.5 M-5.5 0 H5.5" fill="none" stroke="#160510" stroke-width="3.4"/>',
     movement: "healerKeep", attack: "heal", speed: [60, 60], rotMode: "none",
     fireInterval: [1.0, 1.0] // 回復の間隔（HEALER_INTERVAL と同値）
   },
   arc: { // アーク：白黄色の小さなオーブ。3体セットで三角形を作り、回転＋伸縮しながら電気を張って迫る
-    shape: "orb", color: "#ffe66d", r: 11, hp: 1, score: 150,
+    shape: "orb", color: "#ffe66d", r: 11, hp: 4, score: 150,
     name: "アーク", desc: "3体セットで出現。回転＋伸縮する三角形の電気に触れると-10。2体で直線の電気、1体になると電気が消えて突撃する",
     icon: '<circle cx="0" cy="0" r="8" fill="none" stroke="#ffe66d" stroke-width="3"/><circle cx="0" cy="0" r="2.6" fill="#ffe66d"/>',
     movement: "arcOrbit", attack: "none", speed: [75, 75], rotMode: "none" // 中心の移動速度（ARC_CENTER_SPEED と同値）
   },
-  stepper: { // ステッパー：バイオレットの十字。上下左右にだけ決まった歩幅でカクカク進む
-    shape: "cross", color: "#a06bff", r: 13, hp: 0.75, score: 150,
+  stepper: { // ステッパー：バイオレットの十字。上下左右にだけ決まった歩幅でカクカク進む（基本の敵として序盤から出現。耐久は倍の1.5＝6発）
+    shape: "cross", color: "#a06bff", r: 13, hp: 1.5, score: 150,
     name: "ステッパー", desc: "上下左右にだけ、個体ごとの歩幅（56〜84px）を素早く進んでは止まる。射撃なし",
     icon: '<path d="M-4 -12 H4 V-4 H12 V4 H4 V12 H-4 V4 H-12 V-4 H-4 Z" fill="none" stroke="#a06bff" stroke-width="2.6"/>',
     movement: "step", attack: "none", speed: [0, 0], rotMode: "none" // 移動は歩幅と時間で決まる（step部品側で計算）
