@@ -100,6 +100,31 @@ function spawnPointFar(minDist, others) {
   return best;
 }
 
+// 四角小隊の2体目以降の出現点：出現点 p の周り SQUAD_SPREAD_MIN〜MAX の
+// 範囲から引き、既に置いた仲間と SQUAD_MIN_DIST 以上離れた、画面外の
+// 点を返す。数回引き直して条件に合わなければ、最も離れた候補を使う。
+function squadSpawnPoint(p, placed) {
+  var best = null, bestScore = -1;
+  for (var i = 0; i < 8; i++) {
+    var a = Math.random() * Math.PI * 2;
+    var d = rand(SQUAD_SPREAD_MIN, SQUAD_SPREAD_MAX);
+    var x = clamp(p.x + Math.cos(a) * d, 24, WORLD_W - 24);
+    var y = clamp(p.y + Math.sin(a) * d, 24, WORLD_H - 24);
+    var dx = x - player.x, dy = y - player.y;
+    // 画面内に出てしまう候補は使わない（出現点と同じ条件）
+    if (Math.abs(dx) < VIEW_W / 2 + 24 && Math.abs(dy) < VIEW_H / 2 + 24) continue;
+    var md = Infinity;
+    for (var j = 0; j < placed.length; j++) {
+      var ddx = x - placed[j].x, ddy = y - placed[j].y;
+      var dd = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (dd < md) md = dd;
+    }
+    if (md >= SQUAD_MIN_DIST) return { x: x, y: y };
+    if (md > bestScore) { bestScore = md; best = { x: x, y: y }; }
+  }
+  return best || { x: p.x, y: p.y };
+}
+
 // アークの出現：3体セットを1回の出現として出す。3体は中心点を共有し、
 // 初期配置はその時点の伸縮半径で三角形に置く（以降の位置は arcOrbit
 // 部品が毎フレーム決める）。中心点は出現点そのもの。
@@ -132,12 +157,13 @@ function directorUpdate(dt) {
   var toPlayer = Math.atan2(player.y - p.y, player.x - p.x) * 180 / Math.PI;
   if (roll < diff.newProb) {
     // 新敵：既存3種が主役のまま時々混ざる。タンクはその中でもまれ。
-    // 新敵3体（ステッパー／ヒーラー／アーク）は、解放時間以降は新敵枠の
-    // 一部（NEW_TRIO_PROB）を分け合う。残りは従来の内訳どおり。
-    if (elapsed >= STEPPER_UNLOCK_TIME && Math.random() < NEW_TRIO_PROB) {
-      var trio = ["stepper"];
-      if (elapsed >= HEALER_UNLOCK_TIME) trio.push("healer");
-      if (elapsed >= ARC_UNLOCK_TIME) trio.push("arc");
+    // ヒーラー／アークは、解放時間以降は新敵枠の一部（NEW_TRIO_PROB）を
+    // 分け合う。残りは従来の内訳どおり。ステッパーは基本の敵へ移った
+    // ため、ここには含まない（下の基本枠で開始直後から出現する）。
+    var trio = [];
+    if (elapsed >= HEALER_UNLOCK_TIME) trio.push("healer");
+    if (elapsed >= ARC_UNLOCK_TIME) trio.push("arc");
+    if (trio.length && Math.random() < NEW_TRIO_PROB) {
       var tp = trio[Math.floor(Math.random() * trio.length)];
       if (tp === "arc") spawnArcGroup(p);
       else spawnEnemy(tp, p.x, p.y, toPlayer + rand(-14, 14));
@@ -169,14 +195,20 @@ function directorUpdate(dt) {
     spawnEnemy("hexagon", p.x, p.y, toPlayer + rand(-14, 14), { attack: atk });
   } else if (roll < hexP + diff.newProb + diaP) {
     spawnEnemy("diamond", p.x, p.y, toPlayer + rand(-20, 20));
+  } else if (roll < hexP + diff.newProb + diaP + STEPPER_PROB) {
+    // ステッパー：四角・菱形と同じ基本の敵。開始直後から出現する
+    spawnEnemy("stepper", p.x, p.y, toPlayer + rand(-20, 20));
   } else if (Math.random() < SQUAD_PROB) {
-    // 四角の小隊：出現点の周りに固まって押し寄せる
+    // 四角の小隊：数はそのままに、出現位置は出現点の周りに分散させる
+    // （互いに SQUAD_MIN_DIST 以上離し、画面内には出さない）
     var n = 3 + Math.floor(Math.random() * 2);
-    for (var i = 0; i < n; i++) {
-      var ox = rand(-46, 46), oy = rand(-46, 46);
-      spawnEnemy("square",
-        clamp(p.x + ox, 24, WORLD_W - 24), clamp(p.y + oy, 24, WORLD_H - 24),
-        toPlayer + rand(-16, 16));
+    var placed = [{ x: p.x, y: p.y }];
+    spawnEnemy("square", p.x, p.y, toPlayer + rand(-16, 16));
+    for (var i = 1; i < n; i++) {
+      var sp = squadSpawnPoint(p, placed);
+      placed.push(sp);
+      spawnEnemy("square", sp.x, sp.y,
+        Math.atan2(player.y - sp.y, player.x - sp.x) * 180 / Math.PI + rand(-16, 16));
     }
   } else {
     spawnEnemy("square", p.x, p.y, toPlayer + rand(-20, 20));
@@ -448,6 +480,29 @@ function update(dt) {
     }
     // 自機から遠く離れた敵、ワールドの外に出た敵は消す
     if (distP > DESPAWN_DIST || e.x < -70 || e.x > WORLD_W + 70 || e.y < -70 || e.y > WORLD_H + 70) e.dead = true;
+  }
+
+  // 四角同士の分離（四角だけ）：近づきすぎた四角同士を弱く押し離し、
+  // 追跡中も団子状に密集し続けないようにする。押し離しは基準点
+  // （bx, by）にだけ効かせ、表示位置も同期する。重なりが深いほど
+  // 強く、端では弱くなるので、追跡の動きはほとんど邪魔しない。
+  for (i = 0; i < enemies.length; i++) {
+    var se = enemies[i];
+    if (se.type !== "square" || se.dead) continue;
+    for (j = i + 1; j < enemies.length; j++) {
+      var so = enemies[j];
+      if (so.type !== "square" || so.dead) continue;
+      var sdx = so.bx - se.bx, sdy = so.by - se.by;
+      var sd2 = sdx * sdx + sdy * sdy;
+      if (sd2 >= SQUARE_SEP_DIST * SQUARE_SEP_DIST || sd2 < 0.01) continue;
+      var sd = Math.sqrt(sd2);
+      var push = (SQUARE_SEP_DIST - sd) / SQUARE_SEP_DIST * SQUARE_SEP_SPEED * dt;
+      var ux = sdx / sd, uy = sdy / sd;
+      se.bx -= ux * push; se.by -= uy * push;
+      so.bx += ux * push; so.by += uy * push;
+      se.x = se.bx; se.y = se.by;
+      so.x = so.bx; so.y = so.by;
+    }
   }
 
   // 敵の弾
