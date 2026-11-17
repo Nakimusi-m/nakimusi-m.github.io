@@ -168,6 +168,150 @@ registerMovement("drift", function (e, dt) {
     e.by += e.vy * dt;
     e.x = e.bx; e.y = e.by;
 });
+  // 距離維持（ヒーラー）：自機との距離を HEALER_KEEP_MIN〜MAX の帯に保つ。
+  // 近ければ下がり、遠ければ寄り、帯の中では接線方向へゆっくり流れる。
+  // 速度は遅め（敵定義 speed=60。難易度倍率は生成時に diffSpeed で適用済み）。
+registerMovement("healerKeep", function (e, dt) {
+    var dx = player.x - e.bx, dy = player.y - e.by;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    e.dirAngle = Math.atan2(dy, dx);
+    var radial = 0;
+    if (len > HEALER_KEEP_MAX) radial = 1;
+    else if (len < HEALER_KEEP_MIN) radial = -1;
+    e.phase += dt * 0.5;
+    var strafe = radial === 0 ? Math.sin(e.phase) * 0.3 * e.orbitDir : e.orbitDir * 0.18;
+    var radialMul = radial === 0 ? 0.3 : 1; // 帯の中ではゆっくり
+    e.vx = (dx / len * radial * radialMul + (-dy / len) * strafe) * e.speed;
+    e.vy = (dy / len * radial * radialMul + (dx / len) * strafe) * e.speed;
+    e.bx += e.vx * dt;
+    e.by += e.vy * dt;
+    e.x = e.bx; e.y = e.by;
+});
+  // 三角形編隊（アーク）：3体が共有する中心点（arc グループ）を自機へ
+  // 進め、中心を軸に回転させながら、中心からの距離を周期的に伸縮させる
+  // （回転と伸縮は別々の周期で独立に計算する）。中心の前進・回転・伸縮は
+  // 1フレームに1回だけ（生存メンバーの先頭が担当し、elapsed で多重実行を
+  // 防ぐ）。2体になっても中心の動きはそのまま続く。1体だけになれば
+  // 電気は消え、その個体は少し速く真っすぐ自機へ突撃する（通常の追尾）。
+registerMovement("arcOrbit", function (e, dt) {
+    var g = e.arc;
+    if (!g) { e.x = e.bx; e.y = e.by; return; }
+    // このグループで生きているメンバーを数える
+    var alive = [];
+    for (var i = 0; i < enemies.length; i++) {
+      var o = enemies[i];
+      if (o.arc === g && !o.dead) alive.push(o);
+    }
+    if (alive.length <= 1) {
+      // 単独：電気なしの突撃。中心速度に対する比率で速くし、生成時に
+      // 掛かった難易度倍率（と現在の凍結等の倍率）をそのまま保つ。
+      var dx = player.x - e.bx, dy = player.y - e.by;
+      var len = Math.sqrt(dx * dx + dy * dy) || 1;
+      e.dirAngle = Math.atan2(dy, dx);
+      var solo = e.speed * (ARC_SOLO_SPEED / ARC_CENTER_SPEED);
+      e.vx = dx / len * solo; e.vy = dy / len * solo;
+      e.bx += e.vx * dt; e.by += e.vy * dt;
+      e.x = e.bx; e.y = e.by;
+      return;
+    }
+    if (alive[0] === e && g.stampT !== elapsed) {
+      g.stampT = elapsed;
+      // 中心点：自機へまっすぐ進む（速度は担当個体の e.speed＝難易度倍率適用済み）
+      var cdx = player.x - g.cx, cdy = player.y - g.cy;
+      var clen = Math.sqrt(cdx * cdx + cdy * cdy) || 1;
+      g.cx += cdx / clen * e.speed * dt;
+      g.cy += cdy / clen * e.speed * dt;
+      g.cx = clamp(g.cx, 20, WORLD_W - 20);
+      g.cy = clamp(g.cy, 20, WORLD_H - 20);
+      g.angle += dt * Math.PI * 2 / ARC_ROT_PERIOD; // 回転
+      g.pulseT += dt;                                // 伸縮（回転とは独立）
+    }
+    var mid = (ARC_RADIUS_MIN + ARC_RADIUS_MAX) / 2;
+    var ampR = (ARC_RADIUS_MAX - ARC_RADIUS_MIN) / 2;
+    var radius = mid + Math.sin(g.pulseT * Math.PI * 2 / ARC_PULSE_PERIOD) * ampR;
+    var a = g.angle + e.arcSlot * Math.PI * 2 / ARC_GROUP_SIZE;
+    e.x = clamp(g.cx + Math.cos(a) * radius, 12, WORLD_W - 12);
+    e.y = clamp(g.cy + Math.sin(a) * radius, 12, WORLD_H - 12);
+    e.bx = e.x; e.by = e.y; // 単独化した時に追尾の起点がずれないよう同期する
+    e.dirAngle = Math.atan2(player.y - e.y, player.x - e.x);
+    e.vx = 0; e.vy = 0;
+});
+  // カクカク移動（ステッパー）：上下左右にだけ、個体ごとの歩幅
+  // （stepDist）を素早く進んでは止まる、を繰り返す。方向は基本的に
+  // 自機へ近づく軸を選び、STEPPER_SIDE_PROB の確率で横へずれる。
+  // 1回の移動時間は難易度倍率（と凍結等の moveMul）で縮み、歩幅その
+  // ものは変わらない。移動中は短い間隔で残像（ゴースト）を残す。
+registerMovement("step", function (e, dt) {
+    if (e.stepState === "move") {
+      e.stepT += dt / e.stepDur;
+      var t = e.stepT >= 1 ? 1 : e.stepT;
+      var k = 1 - (1 - t) * (1 - t); // ease-out：素早く出て、歩幅の端で収まる
+      e.bx = e.stepFromX + e.stepDirX * e.stepDistEff * k;
+      e.by = e.stepFromY + e.stepDirY * e.stepDistEff * k;
+      e.x = e.bx; e.y = e.by;
+      e.ghostTimer -= dt;
+      if (e.ghostTimer <= 0) { e.ghostTimer = STEPPER_GHOST_INTERVAL; spawnStepperGhost(e); }
+      if (e.stepT >= 1) { e.stepState = "pause"; e.stepTimer = STEPPER_PAUSE_TIME; }
+    } else {
+      e.stepTimer -= dt;
+      if (e.stepTimer <= 0) {
+        var dir = stepperPickDir(e);
+        // ワールド端では歩幅が壁で切り取られる（その分だけ短く進む）
+        var tx = clamp(e.bx + dir.x * e.stepDist, 16, WORLD_W - 16);
+        var ty = clamp(e.by + dir.y * e.stepDist, 16, WORLD_H - 16);
+        var eff = Math.abs(tx - e.bx) + Math.abs(ty - e.by);
+        if (eff < 4) { e.stepTimer = STEPPER_PAUSE_TIME * 0.5; }
+        else {
+          e.stepDirX = dir.x; e.stepDirY = dir.y;
+          e.stepFromX = e.bx; e.stepFromY = e.by;
+          e.stepDistEff = eff;
+          e.stepState = "move"; e.stepT = 0;
+          var mul = difficultyMul() * (e.moveMul || 1);
+          e.stepDur = STEPPER_MOVE_TIME / Math.max(mul, 0.2) * (e.stepDist / eff);
+          e.dirAngle = Math.atan2(dir.y, dir.x);
+          e.ghostTimer = 0;
+        }
+      }
+    }
+    e.x = e.bx; e.y = e.by;
+    e.vx = 0; e.vy = 0;
+});
+// ステッパーの方向決定：自機へ近づく4方向か、横へのずれか
+function stepperPickDir(e) {
+  var dx = player.x - e.bx, dy = player.y - e.by;
+  if (Math.random() < STEPPER_SIDE_PROB) {
+    // 横へずれる：自機への主軸と直角の方向へ（符号はランダム）
+    var s = Math.random() < 0.5 ? 1 : -1;
+    if (Math.abs(dx) >= Math.abs(dy)) return { x: 0, y: s };
+    return { x: s, y: 0 };
+  }
+  // 自機へ近づく：成分の大きい軸の方向へ
+  if (Math.abs(dx) >= Math.abs(dy)) return { x: dx >= 0 ? 1 : -1, y: 0 };
+  return { x: 0, y: dy >= 0 ? 1 : -1 };
+}
+// アークの電気のリンク一覧：同じグループで生きている個体同士の全ペア。
+// 3体なら3辺（三角形）、2体なら1辺（直線）、1体なら空（電気なし）。
+// 当たり判定（game.js）と描画（render.js）の両方が使う。
+function arcLinks() {
+  var links = [];
+  var groups = [];
+  var i, j, e;
+  for (i = 0; i < enemies.length; i++) {
+    e = enemies[i];
+    if (e.type === "arc" && !e.dead && e.arc && groups.indexOf(e.arc) < 0) groups.push(e.arc);
+  }
+  for (i = 0; i < groups.length; i++) {
+    var members = [];
+    for (j = 0; j < enemies.length; j++) {
+      e = enemies[j];
+      if (e.type === "arc" && !e.dead && e.arc === groups[i]) members.push(e);
+    }
+    for (var a = 0; a < members.length; a++) {
+      for (var b = a + 1; b < members.length; b++) links.push([members[a], members[b]]);
+    }
+  }
+  return links;
+}
 
 
 /* ============================================================
@@ -242,6 +386,30 @@ registerAttack("pulse", function (e) {
         o.invulnTimer = AMP_INVULN_TIME;
         o.buffFrom = e;
       }
+    }
+});
+  // 回復（ヒーラー）：周囲 HEALER_RANGE 以内で傷ついている味方を近い順に
+  // 最大 HEALER_MAX_TARGETS 体まで選び、それぞれの最大HPの
+  // HEALER_FRACTION（20%）を回復する（最大HPは超えない）。対象は
+  // enemies にいる通常敵のみ：ボス本体・砲塔は enemies に含まれない
+  // ため自然に対象外となり、自分自身も除く。他のヒーラーは対象に含む。
+  // 回復した相手へはビーム（healBeams）と緑の火花で見た目にも示す。
+registerAttack("heal", function (e) {
+    var cands = [];
+    for (var i = 0; i < enemies.length; i++) {
+      var o = enemies[i];
+      if (o === e || o.dead || o.hp >= o.maxHp) continue;
+      var dx = o.x - e.x, dy = o.y - e.y;
+      var d2 = dx * dx + dy * dy;
+      if (d2 <= HEALER_RANGE * HEALER_RANGE) cands.push({ o: o, d2: d2 });
+    }
+    cands.sort(function (a, b) { return a.d2 - b.d2; });
+    var n = Math.min(cands.length, HEALER_MAX_TARGETS);
+    for (var j = 0; j < n; j++) {
+      var t = cands[j].o;
+      t.hp = Math.min(t.maxHp, t.hp + t.maxHp * HEALER_FRACTION);
+      healBeams.push({ x1: e.x, y1: e.y, x2: t.x, y2: t.y, life: HEALER_BEAM_LIFE, maxLife: HEALER_BEAM_LIFE });
+      spawnSparks(t.x, t.y, "#6dffb8", 2);
     }
 });
 
