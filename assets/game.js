@@ -13,7 +13,7 @@ function spawnEnemy(typeName, x, y, headingDeg, opts) {
   opts = opts || {};
   var t = ENEMY_TYPES[typeName];
   var rad = headingDeg * Math.PI / 180;
-  var speed = (opts.speed != null ? opts.speed : rand(t.speed[0], t.speed[1])) * diff.speedMul;
+  var speed = (opts.speed != null ? opts.speed : rand(t.speed[0], t.speed[1])) * diff.speedMul * difficultyMul();
   var e = {
     uid: ++enemyUidSeq,
     type: typeName, shape: t.shape, color: t.color,
@@ -151,6 +151,15 @@ function directorUpdate(dt) {
    ゲーム状態
    ============================================================ */
 var state = "title"; // title | playing | paused | over
+// ---- 難易度（タイトル／リトライ画面でのみ変更でき、プレイ中は固定） ----
+var difficulty = "normal"; // デフォルトはノーマル
+// 現在の難易度の速度倍率（敵の移動速度と敵弾の速度にだけ掛かる）
+function difficultyMul() {
+  for (var di = 0; di < DIFFICULTY_DEFS.length; di++) {
+    if (DIFFICULTY_DEFS[di].id === difficulty) return DIFFICULTY_DEFS[di].mul;
+  }
+  return 1;
+}
 var player, bullets, enemyBullets, enemies, particles, popups, stars;
 var shards, rings, sparks;
 var frostZones = []; // フロスターの凍結エリア {x, y, r, life, maxLife}
@@ -198,9 +207,10 @@ var odOffsets = NOZZLE_OFFSETS, odForwards = NOZZLE_FORWARD, odMuzzles = MUZZLE_
 var DRONE_ROLES = {
   attacker: { max: DRONE_ATTACKER_MAX, name: "アタッカー", color: "#ff8c1a" },
   guard: { max: DRONE_GUARD_MAX, name: "ガード", color: "#2d7bff" },
-  booster: { max: DRONE_BOOSTER_MAX, name: "ブースター", color: "#ffc233" }
+  booster: { max: DRONE_BOOSTER_MAX, name: "ブースター", color: "#ffc233" },
+  sniper: { max: DRONE_SNIPER_MAX, name: "スナイパー", color: "#2ee6a0" }
 };
-var DRONE_ROLE_ORDER = ["attacker", "guard", "booster"];
+var DRONE_ROLE_ORDER = ["attacker", "guard", "booster", "sniper"];
 var iceShots = [];            // 飛行中の氷結弾 {x,y,tx,ty,t,dur}
 var warnSfxT = 0;             // 警報音の間引きタイマ
 var bossBarShatterT = 0;      // ボスバーの「砕ける」演出の残り時間
@@ -270,12 +280,14 @@ function makeStars() {
    弾
    ============================================================ */
 function spawnEnemyBullet(x, y, dx, dy, speed, dmg) {
-  enemyBullets.push({ x: x, y: y, vx: dx * speed, vy: dy * speed, r: 4.5, dmg: dmg || ENEMY_BULLET_DMG });
+  var sp = speed * difficultyMul(); // 敵弾の速度にも難易度倍率が掛かる
+  enemyBullets.push({ x: x, y: y, vx: dx * sp, vy: dy * sp, r: 4.5, dmg: dmg || ENEMY_BULLET_DMG });
   sfxEnemyShoot();
 }
 // ボスの弾は連射が激しいため、発射音なしで直接積む
 function spawnBossBullet(x, y, angle, speed, dmg) {
-  enemyBullets.push({ x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, r: 4.5, dmg: dmg });
+  var sp = speed * difficultyMul(); // ボス弾（拡散・バースト・回転弾幕）にも同じ倍率
+  enemyBullets.push({ x: x, y: y, vx: Math.cos(angle) * sp, vy: Math.sin(angle) * sp, r: 4.5, dmg: dmg });
 }
 
 /* ============================================================
@@ -405,8 +417,8 @@ function bossUpdate(dt) {
       }
     } else if (b.chargeState === "dash") {
       charging = true;
-      b.x += Math.cos(b.chargeAngle) * BOSS_CHARGE_SPEED * frostMul * dt;
-      b.y += Math.sin(b.chargeAngle) * BOSS_CHARGE_SPEED * frostMul * dt;
+      b.x += Math.cos(b.chargeAngle) * BOSS_CHARGE_SPEED * frostMul * difficultyMul() * dt;
+      b.y += Math.sin(b.chargeAngle) * BOSS_CHARGE_SPEED * frostMul * difficultyMul() * dt;
       b.chargeTimer -= dt;
       if (b.chargeTimer <= 0) { b.chargeState = "recover"; b.chargeTimer = 1.0; }
     } else if (b.chargeState === "recover") {
@@ -418,7 +430,7 @@ function bossUpdate(dt) {
     }
   }
   if (!charging) {
-    var speed = (b.phase === 2 ? BOSS_SPEED_P2 : BOSS_SPEED) * frostMul;
+    var speed = (b.phase === 2 ? BOSS_SPEED_P2 : BOSS_SPEED) * frostMul * difficultyMul();
     if (b.chargeState === "tele" || b.chargeState === "recover") speed *= 0.25; // 予告・硬直中はほぼ止まる
     b.strafeT -= dt;
     if (b.strafeT <= 0) { b.strafeT = rand(2, 4); b.strafeDir *= -1; }
@@ -494,7 +506,7 @@ function bossUpdate(dt) {
       var tg = iceTargets[it];
       var tdx = tg.x - b.x, tdy = tg.y - b.y;
       var tdist = Math.sqrt(tdx * tdx + tdy * tdy);
-      iceShots.push({ x: b.x, y: b.y, sx: b.x, sy: b.y, tx: tg.x, ty: tg.y, t: 0, dur: Math.max(tdist / BOSS_ICE_SPEED, 0.25) });
+      iceShots.push({ x: b.x, y: b.y, sx: b.x, sy: b.y, tx: tg.x, ty: tg.y, t: 0, dur: Math.max(tdist / (BOSS_ICE_SPEED * difficultyMul()), 0.25) });
     }
     tone(300, 700, 0.18, "sine", 0.04);
   }
@@ -729,7 +741,8 @@ function bossBulletCollisions() {
 /* ============================================================
    子機（ドローン）
    役割ごとに指定位置へ追従し、アタッカーは散弾、ガードは
-   シールド、ブースターはOD強化を担う。全機が敵弾を体で防ぎ、
+   シールド、ブースターはOD強化、スナイパーは長射程の狙撃を担う。
+   全機が敵弾を体で防ぎ、
    HPが尽きると30秒の機能停止に入る（OD発動では回復しない）。
    数値は config.js の DRONE_* / CAPSULE_* を参照する。
    ============================================================ */
@@ -750,19 +763,42 @@ function addDrone(role) {
     role: role, x: player.x, y: player.y,
     hp: DRONE_HP[role], maxHp: DRONE_HP[role], down: false, reviveT: 0,
     fireTimer: 0.25 + idx * 0.13, // 複数機は発射タイミングをずらす
-    aim: player.angle
+    aim: player.angle,
+    // ガードのシールドHP制（他役割では未使用）：満タンで展開し、
+    // 0になると割れて shieldRegenT 秒後に全回復で自動再展開する
+    shieldHp: DRONE_GUARD_SHIELD_HP, shieldDown: false, shieldRegenT: 0, shieldFlash: 0,
+    // スナイパーの照準ステート（他役割では未使用）：照準中は目標を保持する
+    snipeState: null, snipeTarget: null, snipeTimer: 0
   });
 }
-// 点(x, y)を覆っている稼働中ガードの数（ダメージカットの計算用）
+// 点(x, y)を覆っている、シールド展開中のガードの数（ダメージカットの計算用）。
+// シールドが割れている間は軽減も切れるので数に入れない。
 function guardCoverCount(x, y) {
   var n = 0;
   for (var i = 0; i < drones.length; i++) {
     var d = drones[i];
-    if (d.role !== "guard" || d.down) continue;
+    if (d.role !== "guard" || d.down || d.shieldDown) continue;
     var dx = x - d.x, dy = y - d.y;
     if (dx * dx + dy * dy <= DRONE_GUARD_SHIELD_R * DRONE_GUARD_SHIELD_R) n++;
   }
   return n;
+}
+// ガードのシールドが敵弾を1発受けた：シールドHPが1減り、
+// 0になると割れる（演出＋音）。再展開までのタイマーは updateDrones が進める。
+function hitGuardShield(d) {
+  if (d.shieldDown) return;
+  d.shieldHp -= 1;
+  d.shieldFlash = 0.14;
+  spawnSparks(d.x, d.y, "#9fd0ff", 2);
+  sfxShieldHit();
+  if (d.shieldHp <= 0) {
+    d.shieldHp = 0;
+    d.shieldDown = true;
+    d.shieldRegenT = DRONE_GUARD_SHIELD_REGEN;
+    burst(d.x, d.y, "#9fd0ff", 16);
+    spawnRing(d.x, d.y, "#9fd0ff", 2);
+    sfxShieldBreak();
+  }
 }
 // 子機が敵弾を受けた：弾1発＝ダメージ1（ガード圏内ならカット適用）。
 // HPが尽きると機能停止し、30秒後に自動復帰する。
@@ -798,10 +834,15 @@ function droneSlotTarget(d, idx) {
   var px = -sa, py = ca; // 進行方向と直角
   var f, s;
   if (d.role === "attacker") {
-    // 斜め四隅：前方左・前方右・後方左・後方右の順に埋まる
+    // 斜め前方2枠のみ：前方左・前方右の順に埋まる
     var diag = DRONE_ATTACKER_DIST / Math.SQRT2;
-    f = (idx < 2) ? diag : -diag;
+    f = diag;
     s = (idx % 2 === 0) ? -diag : diag;
+  } else if (d.role === "sniper") {
+    // 斜め後方2枠：後方左・後方右の順に埋まる
+    var sdiag = DRONE_SNIPER_DIST / Math.SQRT2;
+    f = -sdiag;
+    s = (idx % 2 === 0) ? -sdiag : sdiag;
   } else { // guard：斜め後方2か所
     var gdiag = DRONE_GUARD_DIST / Math.SQRT2;
     f = -gdiag;
@@ -816,8 +857,23 @@ function boosterTailTarget(idx) {
   var want = (idx + 1) * DRONE_BOOSTER_GAP;
   return { x: player.x - Math.cos(player.angle) * want, y: player.y - Math.sin(player.angle) * want };
 }
+// 子機を目標点へ「ある程度の速度」で移動させる（全子機共通）。
+// 最高速度は DRONE_FOLLOW_SPEED（自機の通常速度より少し遅い）で、
+// 目標に近づくと距離に比例して減速し、滑らかに収まる。大きく
+// 引き離された時だけ上限を DRONE_FOLLOW_CATCHUP_SPEED まで上げ、
+// 置き去りになって破綻しないようにする。
+function moveDroneTo(d, tx, ty, dt) {
+  var dx = tx - d.x, dy = ty - d.y;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 0.5) return;
+  var cap = dist > DRONE_FOLLOW_CATCHUP_DIST ? DRONE_FOLLOW_CATCHUP_SPEED : DRONE_FOLLOW_SPEED;
+  var spd = Math.min(cap, dist * (DRONE_FOLLOW_SPEED / DRONE_FOLLOW_ARRIVE_R));
+  var step = Math.min(dist, spd * dt);
+  d.x += dx / dist * step;
+  d.y += dy / dist * step;
+}
 function updateDrones(dt) {
-  var roleIdx = { attacker: 0, guard: 0, booster: 0 };
+  var roleIdx = { attacker: 0, guard: 0, booster: 0, sniper: 0 };
   for (var i = 0; i < drones.length; i++) {
     var d = drones[i];
     var idx = roleIdx[d.role]++;
@@ -826,31 +882,22 @@ function updateDrones(dt) {
       d.reviveT -= dt;
       if (d.reviveT <= 0) { d.down = false; d.hp = d.maxHp; burst(d.x, d.y, DRONE_ROLES[d.role].color, 6); }
     }
-    // ---- 指定位置への追従 ----
-    if (d.role === "booster") {
-      var bt = boosterTailTarget(idx);
-      var bdx = bt.x - d.x, bdy = bt.y - d.y;
-      var bdist = Math.sqrt(bdx * bdx + bdy * bdy);
-      if (bdist > 0.5) {
-        var bstep = Math.min(bdist, Math.max(DRONE_FOLLOW_TAIL_SPEED * dt, bdist * Math.min(1, dt * 14)));
-        d.x += bdx / bdist * bstep; d.y += bdy / bdist * bstep;
-      }
-    } else {
-      var t = droneSlotTarget(d, idx);
-      var dx = t.x - d.x, dy = t.y - d.y;
-      if (d.role === "guard") {
-        // ガードだけ意図的に遅い：最大追従速度に上限があり、
-        // 自機が高速で動き続けると置いていかれる
-        var dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 0.5) {
-          var step = Math.min(dist * Math.min(1, dt * 6), DRONE_GUARD_FOLLOW_SPEED * dt);
-          d.x += dx / dist * step; d.y += dy / dist * step;
+    // ---- ガードのシールド：割れている間は再展開タイマーを進める ----
+    if (d.role === "guard") {
+      if (d.shieldFlash > 0) d.shieldFlash -= dt;
+      if (d.shieldDown) {
+        d.shieldRegenT -= dt;
+        if (d.shieldRegenT <= 0) {
+          d.shieldDown = false;
+          d.shieldHp = DRONE_GUARD_SHIELD_HP; // 全回復で自動再展開
+          spawnRing(d.x, d.y, "#9fd0ff", 1);
+          sfxShieldRestore();
         }
-      } else {
-        var k = Math.min(1, dt * DRONE_FOLLOW_FAST);
-        d.x += dx * k; d.y += dy * k;
       }
     }
+    // ---- 指定位置への追従（全役割共通の最高速度つき移動） ----
+    var tgt = d.role === "booster" ? boosterTailTarget(idx) : droneSlotTarget(d, idx);
+    moveDroneTo(d, tgt.x, tgt.y, dt);
     d.x = clamp(d.x, 8, WORLD_W - 8); d.y = clamp(d.y, 8, WORLD_H - 8);
     // ---- アタッカーの散弾（全機共通） ----
     if (d.role === "attacker" && !d.down) {
@@ -860,29 +907,63 @@ function updateDrones(dt) {
         droneAttackerFire(d);
       }
     }
+    // ---- スナイパーの狙撃（照準→発射のステートマシン） ----
+    if (d.role === "sniper" && !d.down) {
+      updateDroneSniper(d, dt);
+    } else if (d.role === "sniper") {
+      d.snipeState = null; d.snipeTarget = null; // 機能停止中は照準を解除
+    }
   }
 }
-// アタッカー：最寄りの敵（ボスの砲塔・本体も含む）へ散弾5粒
-function droneAttackerFire(d) {
-  var bestT = null, bestD2 = DRONE_ATTACKER_RANGE * DRONE_ATTACKER_RANGE;
+// 子機の共通目標探索：射程内の最寄りの敵（ボスの砲塔・本体も含む）を
+// {kind, ref, x, y} で返す。スナイパーは照準中も目標を追い続けるため、
+// 位置は ref から都度引き直せる形で保持する。
+function findDroneTarget(d, range) {
+  var bestT = null, bestD2 = range * range;
   var i, dx, dy, d2;
   for (i = 0; i < enemies.length; i++) {
     var e = enemies[i];
     if (e.dead) continue;
     dx = e.x - d.x; dy = e.y - d.y; d2 = dx * dx + dy * dy;
-    if (d2 < bestD2) { bestD2 = d2; bestT = { x: e.x, y: e.y }; }
+    if (d2 < bestD2) { bestD2 = d2; bestT = { kind: "enemy", ref: e, x: e.x, y: e.y }; }
   }
   if (boss && boss.phase !== "finish") {
     for (i = 0; i < boss.turrets.length; i++) {
       var tr = boss.turrets[i];
       if (!tr.alive) continue;
       dx = tr.x - d.x; dy = tr.y - d.y; d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestD2 = d2; bestT = { x: tr.x, y: tr.y }; }
+      if (d2 < bestD2) { bestD2 = d2; bestT = { kind: "turret", ref: tr, x: tr.x, y: tr.y }; }
     }
     // 本体は第1段階からダメージが通るので、常に照準候補に入れる
     dx = boss.x - d.x; dy = boss.y - d.y; d2 = dx * dx + dy * dy;
-    if (d2 < bestD2) { bestD2 = d2; bestT = { x: boss.x, y: boss.y }; }
+    if (d2 < bestD2) { bestD2 = d2; bestT = { kind: "boss", ref: boss, x: boss.x, y: boss.y }; }
   }
+  return bestT;
+}
+// 保持中の目標の現在位置を返す。目標が倒れた・消えた場合は null
+// （スナイパーは照準を中止して狙い直す）。
+function droneTargetPos(t) {
+  if (!t) return null;
+  if (t.kind === "enemy") {
+    if (t.ref.dead) return null;
+    return { x: t.ref.x, y: t.ref.y };
+  }
+  if (t.kind === "turret") {
+    if (!t.ref.alive) return null;
+    return { x: t.ref.x, y: t.ref.y };
+  }
+  // boss
+  if (!boss || boss.phase === "finish") return null;
+  return { x: boss.x, y: boss.y };
+}
+// 描画側（照準線）が使う：スナイパーの現在の照準先
+function droneSniperAimPos(d) {
+  if (d.snipeState !== "aim") return null;
+  return droneTargetPos(d.snipeTarget);
+}
+// アタッカー：最寄りの敵（ボスの砲塔・本体も含む）へ散弾5粒
+function droneAttackerFire(d) {
+  var bestT = findDroneTarget(d, DRONE_ATTACKER_RANGE);
   if (!bestT) return;
   var base = Math.atan2(bestT.y - d.y, bestT.x - d.x);
   d.aim = base;
@@ -895,6 +976,44 @@ function droneAttackerFire(d) {
       pierce: false, gold: false, sizeMul: 0.7, hitUids: null,
       drone: true, rangeLeft: DRONE_PELLET_RANGE
     });
+  }
+}
+// スナイパー：射程内の最寄りの目標へ照準線を DRONE_SNIPER_AIM_TIME 秒
+// 表示してから単発を撃つ。照準中に目標が倒れたら撃たずに狙い直す。
+// 射程内に目標がいない時は撃たない（短い間隔で探し直すだけ）。
+function updateDroneSniper(d, dt) {
+  if (d.snipeState === "aim") {
+    var pos = droneTargetPos(d.snipeTarget);
+    if (!pos) { // 照準中に目標が倒れた：中止して狙い直しへ
+      d.snipeState = null; d.snipeTarget = null;
+      d.fireTimer = 0.2;
+      return;
+    }
+    d.aim = Math.atan2(pos.y - d.y, pos.x - d.x); // 照準線は目標を追い続ける
+    d.snipeTimer -= dt;
+    if (d.snipeTimer <= 0) {
+      var a = Math.atan2(pos.y - d.y, pos.x - d.x);
+      bullets.push({
+        x: d.x + Math.cos(a) * 13, y: d.y + Math.sin(a) * 13,
+        vx: Math.cos(a) * DRONE_SNIPER_BULLET_SPEED, vy: Math.sin(a) * DRONE_SNIPER_BULLET_SPEED,
+        angle: a, r: 2.6, dmg: DRONE_SNIPER_DMG,
+        pierce: false, gold: false, sizeMul: 0.9, hitUids: null,
+        drone: true, snipe: true, rangeLeft: DRONE_SNIPER_BULLET_RANGE
+      });
+      d.snipeState = null; d.snipeTarget = null;
+      d.fireTimer = DRONE_SNIPER_INTERVAL;
+    }
+    return;
+  }
+  d.fireTimer -= dt;
+  if (d.fireTimer <= 0) {
+    var t = findDroneTarget(d, DRONE_SNIPER_RANGE);
+    if (t) {
+      d.snipeState = "aim"; d.snipeTarget = t; d.snipeTimer = DRONE_SNIPER_AIM_TIME;
+      d.aim = Math.atan2(t.y - d.y, t.x - d.x);
+    } else {
+      d.fireTimer = 0.15; // 目標なし：少し待って探し直す
+    }
   }
 }
 // ---- ドロップカプセル ----
@@ -928,7 +1047,7 @@ function updateCapsules(dt) {
 // 4. 満員で全機が無傷 → 代替報酬+300点（スコアのみ、HP回復はなし）
 function pickupCapsule(c) {
   var role = c.role;
-  if (role === "random") role = DRONE_ROLE_ORDER[Math.floor(Math.random() * 3)];
+  if (role === "random") role = DRONE_ROLE_ORDER[Math.floor(Math.random() * DRONE_ROLE_ORDER.length)];
   var text = null, color = DRONE_ROLES[role].color;
   if (droneCount(role) < DRONE_ROLES[role].max) {
     addDrone(role);
@@ -966,7 +1085,7 @@ function pickupCapsule(c) {
   updateHud();
 }
 // ボス撃破報酬の子機+1：まだ持っていない役割を優先し、
-// 次に機数の少ない役割（同数なら attacker→guard→booster の順）。
+// 次に機数の少ない役割（同数なら attacker→guard→booster→sniper の順）。
 // 全役割が上限なら +1,000点。
 function grantBossDroneReward() {
   var role = null, i, cnt;
@@ -1214,6 +1333,24 @@ function update(dt) {
   // 当たり判定：自機の弾 × ボス（砲塔・本体・バリア・処刑中の残骸）
   bossBulletCollisions();
 
+  // 当たり判定：敵弾 × ガードのシールド（展開中の泡に触れた弾は
+  // 消え、シールドが1発分を受ける。ボス弾も同じく1発＝1。
+  // 泡の中の自機・子機にはその弾は当たらない）
+  for (i = enemyBullets.length - 1; i >= 0; i--) {
+    eb = enemyBullets[i];
+    if (eb.dead) continue;
+    for (var gi = 0; gi < drones.length; gi++) {
+      var gd = drones[gi];
+      if (gd.role !== "guard" || gd.down || gd.shieldDown) continue;
+      dx = eb.x - gd.x; dy = eb.y - gd.y; rr = DRONE_GUARD_SHIELD_R + eb.r;
+      if (dx * dx + dy * dy < rr * rr) {
+        eb.dead = true;
+        hitGuardShield(gd);
+        break;
+      }
+    }
+  }
+
   // 当たり判定：敵弾 × 子機（稼働中の子機は体で弾を防ぐ。
   // 機能停止中の子機は防げず、敵本体とは当たり判定なし＝すり抜ける）
   for (i = enemyBullets.length - 1; i >= 0; i--) {
@@ -1370,7 +1507,8 @@ var droneRowCache = "";
 var DRONE_ICONS = {
   attacker: '<svg viewBox="-10 -10 20 20"><path d="M0 -7 L5.5 5 L-5.5 5 Z" fill="none" stroke="#ff8c1a" stroke-width="2.4"/></svg>',
   guard: '<svg viewBox="-10 -10 20 20"><circle cx="0" cy="2" r="4.5" fill="none" stroke="#2d7bff" stroke-width="2.2"/><path d="M-7 -3 A7.6 7.6 0 0 1 7 -3" fill="none" stroke="#9fd0ff" stroke-width="3"/></svg>',
-  booster: '<svg viewBox="-10 -10 20 20"><circle cx="0" cy="0" r="5.5" fill="none" stroke="#ffc233" stroke-width="3.4"/></svg>'
+  booster: '<svg viewBox="-10 -10 20 20"><circle cx="0" cy="0" r="5.5" fill="none" stroke="#ffc233" stroke-width="3.4"/></svg>',
+  sniper: '<svg viewBox="-10 -10 20 20"><path d="M0 -8 L4 0 L0 8 L-4 0 Z" fill="none" stroke="#2ee6a0" stroke-width="2.2"/></svg>'
 };
 function updateDroneRow() {
   if (!el.droneRow) return;
@@ -1462,6 +1600,25 @@ document.getElementById("btn-pause").addEventListener("click", function () {
   if (state === "playing") pauseGame();
   else if (state === "paused") resumeGame();
 });
+/* ============================================================
+   難易度セレクタ（タイトル画面とリトライ画面の両方に置く）
+   選択は両画面で同期する。プレイ中はどちらの画面も出ないため、
+   難易度はそのプレイの間ずっと固定される。
+   ============================================================ */
+function setDifficulty(id) {
+  difficulty = id;
+  var btns = document.querySelectorAll(".diff-btn");
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle("selected", btns[i].getAttribute("data-diff") === id);
+  }
+}
+var diffBtns = document.querySelectorAll(".diff-btn");
+for (var dbi = 0; dbi < diffBtns.length; dbi++) {
+  (function (btn) {
+    btn.addEventListener("click", function () { setDifficulty(btn.getAttribute("data-diff")); });
+  })(diffBtns[dbi]);
+}
+setDifficulty(difficulty); // 初期表示（デフォルト＝ノーマル）を選択状態にする
 /* ============================================================
    全画面＋横向き固定
    ボタンを押すとステージを全画面にし、対応端末では画面の
