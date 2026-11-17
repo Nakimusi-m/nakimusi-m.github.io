@@ -99,6 +99,26 @@ function sfxDroneDown() {
   if (!soundOn || !audioCtx) return;
   tone(520, 160, 0.18, "triangle", 0.07);
 }
+// ガードのシールドが敵弾を受けた音：小さなチッという音（間引きつき）
+var lastShieldHitAt = 0;
+function sfxShieldHit() {
+  if (!soundOn || !audioCtx) return;
+  var now = performance.now();
+  if (now - lastShieldHitAt < 70) return;
+  lastShieldHitAt = now;
+  tone(1500, 1100, 0.05, "sine", 0.025);
+}
+// ガードのシールドが割れた音：ガラスが砕けるような高音＋ノイズ
+function sfxShieldBreak() {
+  if (!soundOn || !audioCtx) return;
+  tone(1700, 240, 0.28, "sawtooth", 0.06);
+  noiseBurst(0.24, 3400, 0.09);
+}
+// ガードのシールド再展開：短い上昇音
+function sfxShieldRestore() {
+  if (!soundOn || !audioCtx) return;
+  tone(660, 1180, 0.12, "sine", 0.045);
+}
 function sfxGameOver() {
   tone(392, 392, 0.16, "square", 0.08);
   setTimeout(function () { tone(311, 311, 0.16, "square", 0.08); }, 170);

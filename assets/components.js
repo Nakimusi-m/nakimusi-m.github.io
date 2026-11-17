@@ -112,8 +112,9 @@ registerMovement("dash", function (e, dt) {
       e.dashTimer -= dt;
       if (e.dashTimer <= 0) {
         e.dashState = "dashing"; e.dashTimer = DASH_TIME;
-        e.dashVx = Math.cos(e.dirAngle) * DASH_SPEED;
-        e.dashVy = Math.sin(e.dirAngle) * DASH_SPEED;
+        // 突進速度も敵の移動速度として難易度倍率の対象にする
+        e.dashVx = Math.cos(e.dirAngle) * DASH_SPEED * difficultyMul();
+        e.dashVy = Math.sin(e.dirAngle) * DASH_SPEED * difficultyMul();
         e.vx = e.dashVx; e.vy = e.dashVy;
       }
     } else if (e.dashState === "dashing") {

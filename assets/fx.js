@@ -107,12 +107,14 @@ function killEnemy(e) {
     if (odGauge >= 100) activateOverdrive();
   }
   // 子機カプセルのドロップ（ボス戦中は発生しない）：
-  // スパイラル→アタッカー、ガーディアン→ガード、アンプ→ブースターは100%、
-  // タンクはランダム（白銀のカプセル、中身は拾うまで分からない）。
+  // スパイラル→アタッカー、ガーディアン→ガード、アンプ→ブースター、
+  // スナイパー→スナイパーは100%、タンクはランダム（白銀のカプセル、
+  // 中身は拾うまで分からない。候補は全役割）。
   if (!boss) {
     if (e.type === "spiral") spawnCapsule(e.x, e.y, "attacker");
     else if (e.type === "guardian") spawnCapsule(e.x, e.y, "guard");
     else if (e.type === "amp") spawnCapsule(e.x, e.y, "booster");
+    else if (e.type === "sniper") spawnCapsule(e.x, e.y, "sniper");
     else if (e.type === "tank") spawnCapsule(e.x, e.y, "random");
   }
   var big = e.maxHp >= 3;

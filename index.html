@@ -70,8 +70,8 @@
           <li><span class="k">RIGHT STICK</span>画面右半分をドラッグ ― その向きを向いて、傾けている間撃ち続ける</li>
           <li class="weapon-row"><span class="k">WEAPON</span>ツインノズル ― 弾を2本同時発射・連射速度2倍（1発のダメージは小さめ）</li>
           <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 弾速3倍・貫通・ダメージ2倍。ブースター子機が多いほど長く続き、ノズルも2本→最大5本に増える</li>
-          <li class="drone-row"><span class="k">DRONE</span>子機カプセル：スパイラル→アタッカー（散弾・斜め四隅・最大4）／ガーディアン→ガード（シールドで被ダメージ30%カット／台・斜め後方・最大2）／アンプ→ブースター（OD強化・後ろに尾行・最大3）。タンクはランダム。シアンの輪が味方の目印です（味方の弾はシアン〜白、敵の弾は赤〜マゼンタ）</li>
-          <li class="drone-row"><span class="k">DRONE HP</span>子機は敵弾を体で防ぐが、アタッカー／ブースターは6発・ガードは9発で機能停止し、30秒で復帰。オーバードライブでは回復しない。満員の役割のパーツを拾うと、停止中（残り時間の長い順）や損傷中の子機がその場で修理される</li>
+          <li class="drone-row"><span class="k">DRONE</span>子機カプセル：スパイラル→アタッカー（散弾・斜め前方・最大2）／ガーディアン→ガード（シールド展開中は圏内の被ダメージ30%カット／台・斜め後方・最大2。シールドは敵弾を防ぐが10発で割れ、6秒後に全回復して自動で張り直される。割れている間は軽減なし）／アンプ→ブースター（OD強化・後ろに尾行・最大3）／敵スナイパー→スナイパー（長射程の単発狙撃・照準線つき・斜め後方・最大2）。タンクはランダム（全役割から）。シアンの輪が味方の目印です（味方の弾はシアン〜白、敵の弾は赤〜マゼンタ）</li>
+          <li class="drone-row"><span class="k">DRONE HP</span>子機は敵弾を体で防ぐが、アタッカー／スナイパー／ブースターは6発・ガードは9発で機能停止し、30秒で復帰。オーバードライブでは回復しない。満員の役割のパーツを拾うと、停止中（残り時間の長い順）や損傷中の子機がその場で修理される</li>
           <li class="pc-row"><span class="k">PC</span>WASD／矢印キーで移動、マウスで狙ってクリックで射撃</li>
           <li class="boss-row"><span class="k">BOSS</span>90秒ごとに要塞ボス「ペルマフロスト」出現 ― 本体にも攻撃は通るが、砲塔が残るほど軽減される（2機でダメージ1/4・1機で1/2・0機で等倍）。砲塔を先に壊せば第2段階へ、残したまま本体を倒し切っても処刑タイムへ（その場合、残った砲塔は無力化され得点は入らない）。ボス戦中はゲージが貯まらない</li>
           <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
@@ -119,7 +119,7 @@
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><path d="M0 -15 L6 9 L0 3 L-6 9 Z" fill="none" stroke="#b6ff2e" stroke-width="2.5"/></svg>
-            <figcaption>狙撃 ・ 250</figcaption>
+            <figcaption>狙撃 ・ 250 ・ スナイパー子機</figcaption>
           </figure>
           <figure>
             <svg viewBox="-20 -20 40 40"><circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/></svg>
@@ -129,6 +129,15 @@
             <svg viewBox="-20 -20 40 40"><polygon points="6,-14 14,-6 14,6 6,14 -6,14 -14,6 -14,-6 -6,-14" fill="none" stroke="#7fd8ff" stroke-width="3"/><circle cx="0" cy="0" r="3.5" fill="#7fd8ff"/></svg>
             <figcaption>ボス ・ 5000</figcaption>
           </figure>
+        </div>
+        <div class="diff-select">
+          <span class="diff-label">DIFFICULTY</span>
+          <div class="diff-btns" role="group" aria-label="難易度">
+            <button class="diff-btn" data-diff="veryeasy">ベリーイージー</button>
+            <button class="diff-btn" data-diff="easy">イージー</button>
+            <button class="diff-btn selected" data-diff="normal">ノーマル</button>
+          </div>
+          <span class="diff-note">敵と敵弾の速さだけが変わります</span>
         </div>
         <div class="btn-row">
           <button class="big-btn" id="btn-start">START</button>
@@ -147,6 +156,14 @@
           <dt>TIME</dt><dd class="small" id="final-time">0:00</dd>
         </dl>
         <p class="new-record" id="new-record" hidden>NEW RECORD</p>
+        <div class="diff-select">
+          <span class="diff-label">DIFFICULTY</span>
+          <div class="diff-btns" role="group" aria-label="難易度">
+            <button class="diff-btn" data-diff="veryeasy">ベリーイージー</button>
+            <button class="diff-btn" data-diff="easy">イージー</button>
+            <button class="diff-btn selected" data-diff="normal">ノーマル</button>
+          </div>
+        </div>
         <button class="big-btn" id="btn-retry">RETRY</button>
       </div>
 

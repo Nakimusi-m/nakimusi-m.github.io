@@ -136,6 +136,16 @@ var DARTER_GROUP = 3;            // ダーターの同時出現数
 var DARTER_FAR_DIST = 280;       // ダーター同士の出現点の最小間隔
 var NEW_MIX = { tank: 0.06, darter: 0.18, splitter: 0.30, spiral: 0.41, guardian: 0.53, bomber: 0.65, froster: 0.76, sniper: 0.88 }; // 新敵枠の内訳（累積）。残りはアンプ。タンクは従来どおりレア、他はほぼ均等
 
+// ---- 難易度（タイトル／リトライ画面で選択。デフォルトはノーマル） ----
+// 効果は「敵の移動速度」と「敵弾の速度」への倍率のみ（ボスの移動・
+// 砲塔弾・バースト・回転弾幕・氷結弾の飛翔速度にも同じ倍率が掛かる）。
+// 出現間隔・HP・ダメージ量・自機性能・スコア計算は難易度で変えない。
+var DIFFICULTY_DEFS = [
+  { id: "veryeasy", label: "ベリーイージー", mul: 0.6 }, // 速度40%低下
+  { id: "easy", label: "イージー", mul: 0.8 },           // 速度20%低下
+  { id: "normal", label: "ノーマル", mul: 1.0 }          // 現状どおり
+];
+
 // ---- 難易度カーブ（computeDiff が参照） ----
 var DIFF_RAMP_TIME = 120;        // 速さ・割合の上昇はこの秒数でほぼ上限（2分）
 var DIFF_SPAWN_RAMP_TIME = 435;  // 出現間隔だけは緩やか：この秒数かけて下限へ（180秒時点の出現量が従来カーブの約半分になる）
@@ -205,15 +215,23 @@ var BOSS_FINISH_FX_TIME = 0.8;   // 処刑完了時、大爆発の前に残骸�
 // 役割ごとに複数機を所持できる（合計最大9機）。全機にHPがあり、
 // 敵弾を体で防ぐが、尽きると機能停止し30秒で復帰する。
 // OD発動では回復しない（修理はカプセル取得時の修理ルールで）。
-var DRONE_HP = { attacker: 6, guard: 9, booster: 6 }; // 役割ごとのHP（敵弾1発＝ダメージ1。ガードは3倍、アタッカー／ブースターは従来の2倍）
+var DRONE_HP = { attacker: 6, guard: 9, booster: 6, sniper: 6 }; // 役割ごとのHP（敵弾1発＝ダメージ1。ガードは3倍、他は従来の2倍）
 var DRONE_REVIVE_TIME = 30;       // 機能停止から復帰までの時間（秒）
 var DRONE_R = 10;                 // 子機の当たり判定半径
-var DRONE_FOLLOW_FAST = 11;       // 追従イージング係数（アタッカー：素早い）
-var DRONE_FOLLOW_TAIL_SPEED = 620; // ブースターの尾の追従の最大速度
+// 追従（全子機共通）：所定の配置位置へ最高速度つきで移動する。
+// 最高速度はガード従来の追従速度（283）より少し速く、ただし自機の
+// 通常移動速度（308）よりは少し遅い値にし、自機が速く動き続けると
+// 子機が少し遅れて追いつく性格を残す。配置位置に近づくと距離に
+// 比例して減速して滑らかに収まる。大きく引き離された時だけ上限を
+// 上げて強めに寄せる（破綻防止）。
+var DRONE_FOLLOW_SPEED = 300;        // 追従の最高速度（全役割共通）
+var DRONE_FOLLOW_ARRIVE_R = 80;      // この距離以内では距離に比例して減速する
+var DRONE_FOLLOW_CATCHUP_DIST = 420; // この距離を超えたら強めに寄せる
+var DRONE_FOLLOW_CATCHUP_SPEED = 640; // 引き離された時の追従の最高速度
 // アタッカー（オレンジ小三角／スパイラルがドロップ）
-// 全機とも散弾型で統一（前方・後方でタイプは変えない）。
-var DRONE_ATTACKER_MAX = 4;
-var DRONE_ATTACKER_DIST = 58;     // 斜め四隅の配置距離
+// 散弾型。配置は斜め前方の2枠のみ（後方2枠はスナイパーが使う）。
+var DRONE_ATTACKER_MAX = 2;
+var DRONE_ATTACKER_DIST = 58;     // 斜め前方の配置距離
 var DRONE_ATTACKER_INTERVAL = 0.15; // 1機あたりの射撃間隔（秒）
 var DRONE_ATTACKER_RANGE = 330;   // この距離内に敵がいるときだけ撃つ（従来380から短縮）
 var DRONE_PELLETS = 5;            // 1射撃の粒数
@@ -226,10 +244,25 @@ var DRONE_GUARD_MAX = 2;
 var DRONE_GUARD_DIST = 40;        // 斜め後方の配置距離（アタッカーより内側）
 var DRONE_GUARD_SHIELD_R = 132;   // シールドの半径（従来の+20%）
 var DRONE_GUARD_CUT = 0.3;        // 圏内のガード1機につきダメージ30%カット
-var DRONE_GUARD_FOLLOW_SPEED = 283; // 追従の最大速度（自機の通常速度308より少し遅い）
+// シールドHP制：シールド自体に体力があり、敵弾1発で1減る（ボス弾も同じ）。
+// 0になると割れて、DRONE_GUARD_SHIELD_REGEN 秒後に全回復で自動再展開する。
+// ダメージ軽減が効くのはシールド展開中だけ。接触ダメージでは減らない。
+var DRONE_GUARD_SHIELD_HP = 10;   // シールドの体力（敵弾10発で割れる）
+var DRONE_GUARD_SHIELD_REGEN = 6; // 割れてから再展開までの時間（秒）
 // ブースター（金の小リング／アンプがドロップ）
 var DRONE_BOOSTER_MAX = 3;
 var DRONE_BOOSTER_GAP = 30;       // 尾の間隔（px）。自機の向きの後ろ側に一列に連なる
+// スナイパー（エメラルドの細長い菱形／敵スナイパーがドロップ）
+// 配置は斜め後方の2枠。長射程の単発狙撃で、発射の少し前に
+// 細い照準線を目標へ表示してから撃つ。貫通なし。
+var DRONE_SNIPER_MAX = 2;
+var DRONE_SNIPER_DIST = 58;       // 斜め後方の配置距離（アタッカーと同距離）
+var DRONE_SNIPER_RANGE = 640;     // 射程：この距離内の最寄りの目標を狙う
+var DRONE_SNIPER_DMG = 1.0;       // 1発のダメージ
+var DRONE_SNIPER_INTERVAL = 1.1;  // 発射間隔（秒）
+var DRONE_SNIPER_BULLET_SPEED = 900; // 弾速
+var DRONE_SNIPER_BULLET_RANGE = 700; // 弾の飛距離（射程より少し長く）
+var DRONE_SNIPER_AIM_TIME = 0.25; // 照準線を表示してから撃つまでの時間（秒）
 // ドロップカプセル
 var CAPSULE_LIFE = 10;            // カプセルの寿命（秒）。残り3秒で点滅
 var CAPSULE_MAGNET_R = 70;        // 吸い寄せが始まる距離
