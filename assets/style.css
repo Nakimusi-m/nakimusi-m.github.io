@@ -242,26 +242,19 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .game-title {
   font-family: Orbitron, monospace; font-weight: 900;
-  font-size: clamp(30px, 6.5vw, 48px); letter-spacing: 0.06em; line-height: 1.05;
+  font-size: clamp(46px, 9.5vw, 76px); letter-spacing: 0.06em; line-height: 1.05;
   color: var(--text);
   text-shadow: 0 0 18px rgba(34, 230, 255, 0.8), 0 0 46px rgba(34, 230, 255, 0.35);
   margin: 0;
 }
 .game-title .accent { color: var(--magenta); text-shadow: 0 0 18px rgba(255, 45, 120, 0.8), 0 0 46px rgba(255, 45, 120, 0.35); }
-.tagline { margin: 10px 0 0; font-size: 13px; color: var(--text-dim); letter-spacing: 0.14em; }
-.rotate-note {
-  display: none; margin: 10px 0 0; font-size: 12px; color: #ffc233; letter-spacing: 0.08em;
-}
-@media (orientation: portrait) {
-  .rotate-note { display: block; }
-}
 /* 右下のサブボタン群（操作方法／敵図鑑／設定） */
 .title-corner {
   position: absolute; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom));
   z-index: 2; display: flex; gap: 8px;
 }
 .corner-btn {
-  min-height: 38px; padding: 0 16px;
+  width: 108px; height: 40px; min-height: 40px; padding: 0;
   font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif; font-size: 13px; font-weight: 700;
   color: var(--cyan); background: rgba(8, 16, 36, 0.72);
   border: 1px solid rgba(34, 230, 255, 0.5); border-radius: 3px; cursor: pointer;
@@ -328,13 +321,15 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 /* 操作方法パネル内の説明リスト */
 .howto {
   margin: 0; padding: 0; list-style: none;
-  display: flex; flex-direction: column; gap: 7px;
-  font-size: 13.5px; line-height: 1.5; color: var(--text);
+  display: flex; flex-direction: column; gap: 9px;
+  font-size: 13.5px; line-height: 1.55; color: var(--text);
   text-align: left;
 }
+/* 項目名は固定幅の左列、説明文は右列：折り返し行も説明文の行頭に揃う */
+.howto li { display: flex; align-items: baseline; gap: 12px; }
 .howto .k {
-  display: inline-block; min-width: 6.5em; margin-right: 8px;
-  font-family: Orbitron, monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--cyan);
+  flex: none; width: 102px; white-space: nowrap;
+  font-family: Orbitron, monospace; font-size: 10px; letter-spacing: 0.16em; color: var(--cyan);
   text-align: right;
 }
 
@@ -399,7 +394,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 .big-btn {
   margin-top: 22px;
-  min-height: 50px; padding: 0 44px;
+  width: 198px; height: 48px; min-height: 48px; padding: 0 12px;
   font-family: Orbitron, monospace; font-weight: 700; font-size: 16px; letter-spacing: 0.24em;
   color: #031018; background: var(--cyan);
   border: none; border-radius: 3px; cursor: pointer;
@@ -413,8 +408,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .btn-row .big-btn { margin-top: 0; }
 .sub-btn {
-  min-height: 50px; padding: 0 22px;
-  display: inline-flex; align-items: center; gap: 9px;
+  width: 198px; height: 48px; min-height: 48px; padding: 0 12px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   font-family: Orbitron, monospace; font-weight: 700; font-size: 13px; letter-spacing: 0.14em;
   color: var(--cyan); background: rgba(8, 16, 36, 0.55);
   border: 1px solid rgba(34, 230, 255, 0.55); border-radius: 3px; cursor: pointer;
@@ -432,8 +427,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .diff-btns { display: flex; gap: 6px; }
 .diff-btn {
-  min-height: 38px; padding: 0 16px;
-  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif; font-size: 13px; font-weight: 700;
+  width: 132px; height: 48px; min-height: 48px; padding: 0 6px;
+  font-family: Orbitron, monospace; font-size: 12.5px; font-weight: 700; letter-spacing: 0.1em;
   color: var(--text-dim); background: rgba(8, 16, 36, 0.55);
   border: 1px solid rgba(140, 180, 210, 0.35); border-radius: 3px; cursor: pointer;
 }
@@ -442,7 +437,6 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   color: #031018; background: var(--cyan); border-color: var(--cyan);
   box-shadow: 0 0 14px rgba(34, 230, 255, 0.5);
 }
-.diff-note { font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; }
 .over-title {
   font-family: Orbitron, monospace; font-weight: 900; font-size: clamp(28px, 6vw, 42px);
   letter-spacing: 0.08em; color: #ff5d5d; margin: 0;
@@ -468,40 +462,36 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 /* 背の低い画面（横向きスマホ等）では中央要素を詰めて収める */
 @media (max-height: 500px), (orientation: portrait) and (max-width: 900px) {
   .overlay { padding: 10px 18px; }
-  .game-title { font-size: 24px; }
-  .tagline { margin-top: 4px; font-size: 11px; }
-  .rotate-note { margin-top: 4px; font-size: 11px; }
+  .game-title { font-size: 36px; }
   .howto { gap: 3px; font-size: 11.5px; }
-  .big-btn { margin-top: 10px; min-height: 42px; font-size: 14px; }
+  .big-btn { margin-top: 10px; width: 164px; height: 40px; min-height: 40px; font-size: 14px; }
   .btn-row { margin-top: 10px; }
-  .sub-btn { min-height: 42px; font-size: 12px; padding: 0 16px; }
+  .sub-btn { width: 164px; height: 40px; min-height: 40px; font-size: 12px; padding: 0 10px; }
   .diff-select { margin-top: 10px; gap: 8px; }
-  .diff-btn { min-height: 34px; font-size: 12px; padding: 0 12px; }
-  .diff-note { display: none; }
+  .diff-btn { width: 112px; height: 40px; min-height: 40px; font-size: 11.5px; padding: 0 4px; }
   .result-grid { margin-top: 10px; }
   .title-corner { right: 8px; bottom: 8px; gap: 6px; }
-  .corner-btn { min-height: 32px; font-size: 12px; padding: 0 12px; }
+  .corner-btn { width: 88px; height: 32px; min-height: 32px; font-size: 12px; padding: 0; }
   .panel { padding: 10px 12px 12px; }
   .enemy-legend figure { width: 138px; padding: 9px 9px; }
 }
 /* 縦持ちではステージの高さが小さいため、タイトル中央要素をさらに詰め、
    右下ボタンと重ならないよう余白を確保する */
 @media (orientation: portrait) and (max-width: 900px) {
-  .tagline { display: none; }
   #ov-title { padding: 8px 12px 44px; }
-  .game-title { font-size: 21px; }
-  .rotate-note { margin-top: 3px; font-size: 10.5px; }
+  .game-title { font-size: 30px; }
   .btn-row { margin-top: 8px; gap: 8px; flex-wrap: nowrap; }
   .diff-select { margin-top: 6px; gap: 6px; }
   .diff-label { display: none; }
-  .diff-btn { min-height: 30px; font-size: 11px; padding: 0 10px; }
-  .big-btn { min-height: 36px; font-size: 13px; padding: 0 24px; }
-  .sub-btn { min-height: 36px; font-size: 11px; padding: 0 12px; white-space: nowrap; }
+  .diff-btn { width: 88px; height: 34px; min-height: 34px; font-size: 10.5px; padding: 0 2px; }
+  .big-btn { width: 132px; height: 34px; min-height: 34px; font-size: 13px; padding: 0 8px; }
+  .sub-btn { width: 132px; height: 34px; min-height: 34px; font-size: 11px; padding: 0 8px; white-space: nowrap; }
   .title-corner { right: 6px; bottom: 6px; }
-  .corner-btn { min-height: 30px; font-size: 11px; padding: 0 10px; }
+  .corner-btn { width: 80px; height: 30px; min-height: 30px; font-size: 11px; padding: 0; }
   .over-title { font-size: 26px; }
   .result-grid { margin-top: 8px; gap: 3px 20px; }
   .result-grid dd { font-size: 20px; }
   .result-grid dd.small { font-size: 15px; }
-  .howto .k { min-width: 5.4em; margin-right: 5px; font-size: 8.5px; }
+  .howto li { gap: 8px; }
+  .howto .k { width: 84px; font-size: 8.5px; letter-spacing: 0.1em; }
 }

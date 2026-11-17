@@ -1,7 +1,7 @@
 "use strict";
 /* ============================================================
    タイトル画面の背景演出（titlebg.js）
-   ボスを除く通常敵12種の図形が、それぞれの色（少し暗く・薄く）で
+   ボスを除く通常敵15種の図形が、それぞれの色（少し暗く・薄く）で
    ゆっくり回転しながら上から降ってくるアニメーションをループさせる。
    図形は装飾専用で、クリックは一切妨げない（pointer-events: none）。
    形と色は敵定義（enemies.js の ENEMY_TYPES）の icon / color を
@@ -10,9 +10,9 @@
 (function buildFallingShapes() {
   var host = document.getElementById("falling-layer");
   if (!host || typeof ENEMY_TYPES === "undefined") return;
-  // ボス（八角形）とスプリッターの分裂世代は含めない：通常敵12種のみ
-  var FALL_TYPES = ["square", "diamond", "hexagon", "darter", "splitter", "tank", "spiral", "guardian", "bomber", "froster", "sniper", "amp"];
-  var COUNT = 22;
+  // ボス（八角形）とスプリッターの分裂世代は含めない：通常敵15種のみ
+  var FALL_TYPES = ["square", "diamond", "hexagon", "darter", "splitter", "tank", "spiral", "guardian", "bomber", "froster", "sniper", "amp", "healer", "arc", "stepper"];
+  var COUNT = 40;
   var html = "";
   for (var i = 0; i < COUNT; i++) {
     var t = ENEMY_TYPES[FALL_TYPES[i % FALL_TYPES.length]];

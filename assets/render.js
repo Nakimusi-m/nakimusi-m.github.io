@@ -111,6 +111,23 @@ function draw() {
     ctx.restore();
   }
 
+  // ヒーラーの回復ビーム：緑の細い線＋回復先に小さな十字（寿命で薄れる）
+  for (i = 0; i < healBeams.length; i++) {
+    var hb = healBeams[i];
+    var ha = Math.max(hb.life / hb.maxLife, 0);
+    ctx.save();
+    ctx.globalAlpha = ha * 0.85;
+    ctx.strokeStyle = "#6dffb8";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hb.x1, hb.y1); ctx.lineTo(hb.x2, hb.y2); ctx.stroke();
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(hb.x2 - 5, hb.y2); ctx.lineTo(hb.x2 + 5, hb.y2);
+    ctx.moveTo(hb.x2, hb.y2 - 5); ctx.lineTo(hb.x2, hb.y2 + 5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // ドロップカプセル
   drawCapsules();
 
@@ -173,6 +190,45 @@ function draw() {
     ctx.translate(b.x, b.y);
     ctx.rotate(b.angle);
     ctx.drawImage(bspr.c, -bw / 2, -bh / 2, bw, bh);
+    ctx.restore();
+  }
+
+  // ステッパーの残像（ゴースト）：本体より下に、薄く短時間だけ残す
+  for (i = 0; i < stepperGhosts.length; i++) {
+    var gh = stepperGhosts[i];
+    if (Math.abs(gh.x - camX) > VIEW_W / 2 + 40 || Math.abs(gh.y - camY) > VIEW_H / 2 + 40) continue;
+    ctx.save();
+    ctx.globalAlpha = Math.max(gh.life / gh.maxLife, 0) * 0.32;
+    ctx.drawImage(gh.spr.c, gh.x - gh.spr.w / 2, gh.y - gh.spr.h / 2, gh.spr.w, gh.spr.h);
+    ctx.restore();
+  }
+
+  // アークの電気：個体同士を稲妻状に揺れる線で結ぶ（毎フレーム乱数で
+  // 中点をずらし、放電らしくちらつかせる）。3体で三角形、2体で直線。
+  var arcLn = arcLinks();
+  for (i = 0; i < arcLn.length; i++) {
+    var la2 = arcLn[i][0], lb2 = arcLn[i][1];
+    if (Math.abs((la2.x + lb2.x) / 2 - camX) > VIEW_W / 2 + 120 || Math.abs((la2.y + lb2.y) / 2 - camY) > VIEW_H / 2 + 120) continue;
+    var ldx = lb2.x - la2.x, ldy = lb2.y - la2.y;
+    var llen = Math.sqrt(ldx * ldx + ldy * ldy) || 1;
+    var lpx = -ldy / llen, lpy = ldx / llen;
+    var lsegs = 7, lpts = [];
+    for (var ls = 0; ls <= lsegs; ls++) {
+      var lt = ls / lsegs;
+      var loff = (ls === 0 || ls === lsegs) ? 0 : rand(-7, 7);
+      lpts.push([la2.x + ldx * lt + lpx * loff, la2.y + ldy * lt + lpy * loff]);
+    }
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.strokeStyle = "rgba(255, 214, 64, 0.35)";
+    ctx.lineWidth = 3.6;
+    ctx.beginPath();
+    ctx.moveTo(lpts[0][0], lpts[0][1]);
+    for (ls = 1; ls < lpts.length; ls++) ctx.lineTo(lpts[ls][0], lpts[ls][1]);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255, 251, 224, 0.9)";
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -327,10 +383,14 @@ function draw() {
 }
 
 // ミニマップ：ワールド全体と自機・敵・カメラ範囲の位置関係。
-// 右上の設定ボタンの下に、小さく・半透明で置く。
+// 右上のHUD行（経過時間・設定ボタン）の下に、小さく・半透明で置く。
+// HUDはCSSピクセル固定なので、画面が小さいときは論理座標での開始位置を
+// 下げて、歯車ボタンや時間表示に重ならないようにする。
 function drawMinimap() {
   var mw = 100, mh = 56;
-  var mx = VIEW_W - mw - 10, my = 46;
+  var cssScale = view.scale / view.dpr; // 論理座標→CSSピクセルの倍率
+  var mx = VIEW_W - mw - 10;
+  var my = Math.max(46, Math.ceil(44 / cssScale));
   var sx = mw / WORLD_W, sy = mh / WORLD_H;
   ctx.save();
   ctx.globalAlpha = 0.72;

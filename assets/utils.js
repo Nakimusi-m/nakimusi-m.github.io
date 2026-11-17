@@ -13,6 +13,17 @@ function angleLerp(a, b, t) {
 
 function obtain(pool) { return pool.length ? pool.pop() : {}; }
 
+// 点(px, py)と線分(x1, y1)-(x2, y2)の最短距離（アークの電気の当たり判定用）
+function distToSegment(px, py, x1, y1, x2, y2) {
+  var sx = x2 - x1, sy = y2 - y1;
+  var len2 = sx * sx + sy * sy;
+  var t = len2 > 0 ? ((px - x1) * sx + (py - y1) * sy) / len2 : 0;
+  t = t < 0 ? 0 : (t > 1 ? 1 : t);
+  var cx = x1 + sx * t, cy = y1 + sy * t;
+  var dx = px - cx, dy = py - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 // 配列を前詰めで圧縮し、dead な要素だけを取り除く（新規確保なし）
 function sweepDead(arr) {
   var w = 0;

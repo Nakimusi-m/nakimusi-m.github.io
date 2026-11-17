@@ -47,6 +47,27 @@ function buildEnemySprite(t, flash) {
       g.beginPath(); g.arc(0, 0, 3, 0, Math.PI * 2); g.fill();
       return;
     }
+    if (t.shape === "healer") {
+      // ヒーラー：白緑の丸に十字の印
+      g.shadowColor = t.color;
+      g.shadowBlur = 14;
+      g.lineWidth = 2.5;
+      g.strokeStyle = main;
+      g.beginPath(); g.arc(0, 0, t.r * 0.92, 0, Math.PI * 2); g.stroke();
+      g.shadowBlur = 0;
+      g.fillStyle = t.color;
+      g.globalAlpha = 0.16;
+      g.beginPath(); g.arc(0, 0, t.r * 0.92, 0, Math.PI * 2); g.fill();
+      g.globalAlpha = 1;
+      g.strokeStyle = main;
+      g.lineWidth = 4;
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(0, -t.r * 0.52); g.lineTo(0, t.r * 0.52);
+      g.moveTo(-t.r * 0.52, 0); g.lineTo(t.r * 0.52, 0);
+      g.stroke();
+      return;
+    }
     if (t.shape === "guardian") {
       // 本体（少し後ろの円＝半月形の胴）と、正面（上）の盾アーク
       g.shadowColor = t.color;
@@ -218,7 +239,11 @@ function shapePoints(e) {
       a = e.rot - Math.PI / 2 + i * Math.PI * 2 / 5;
       pts.push([Math.cos(a) * r, Math.sin(a) * r]);
     }
-  } else if (e.shape === "circle" || e.shape === "guardian") {
+  } else if (e.shape === "cross") {
+    // 十字（プラス）型：12点の輪郭
+    var w = r * 0.38;
+    pts = [[-w, -r], [w, -r], [w, -w], [r, -w], [r, w], [w, w], [w, r], [-w, r], [-w, w], [-r, w], [-r, -w], [-w, -w]];
+  } else if (e.shape === "circle" || e.shape === "guardian" || e.shape === "orb" || e.shape === "healer") {
     for (i = 0; i < 20; i++) {
       a = i * Math.PI / 10;
       pts.push([Math.cos(a) * r, Math.sin(a) * r]);
