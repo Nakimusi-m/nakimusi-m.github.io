@@ -804,7 +804,7 @@ function drawEnemy(e) {
   var spr = (e.flash > 0 || blink || fuseBlink) ? e.sprFlash : e.spr;
   ctx.save();
   ctx.translate(e.x, e.y);
-  if (e.rotMode === "face") ctx.rotate((e.type === "guardian" && e.faceAngle != null ? e.faceAngle : e.dirAngle) + Math.PI / 2); // 進行方向を向く（ガーディアンは盾の向き）
+  if (e.rotMode === "face") ctx.rotate(((e.type === "guardian" || e.type === "aegis") && e.faceAngle != null ? e.faceAngle : e.dirAngle) + Math.PI / 2); // 進行方向を向く（ガーディアン系は盾の向き）
   else if (e.rotMode === "spin") ctx.rotate(e.rot);
   ctx.drawImage(spr.c, -spr.w / 2, -spr.h / 2, spr.w, spr.h);
   ctx.restore();
@@ -862,16 +862,29 @@ function drawEnemy(e) {
     ctx.stroke();
     ctx.restore();
   }
-  // ガーディアン：盾が弾を防いだ直後は正面アークを強く光らせる
-  if (e.type === "guardian" && e.shieldFlash > 0) {
+  // ガーディアン系：盾が弾を防いだ直後は正面アークを強く光らせる
+  // （アークの幅は shieldHalf に合わせる：イージスは元の1.5倍）
+  if ((e.type === "guardian" || e.type === "aegis") && e.shieldFlash > 0) {
     ctx.save();
     ctx.strokeStyle = "rgba(190, 225, 255, " + Math.min(e.shieldFlash / 0.16, 1) + ")";
     ctx.lineWidth = 5;
     ctx.lineCap = "round";
     ctx.beginPath();
     var gShieldA = e.faceAngle != null ? e.faceAngle : e.dirAngle;
-    ctx.arc(e.x, e.y, e.r + 5, gShieldA - 1.1, gShieldA + 1.1);
+    var gHalf = e.type === "aegis" ? (e.shieldHalf != null ? e.shieldHalf : 1.65) : 1.1;
+    ctx.arc(e.x, e.y, e.r + 5, gShieldA - gHalf, gShieldA + gHalf);
     ctx.stroke();
+    ctx.restore();
+  }
+  // イージスの防御オーラ：範囲（半径200）を薄く示す
+  if (e.type === "aegis") {
+    ctx.save();
+    ctx.fillStyle = "rgba(61, 139, 255, 0.045)";
+    ctx.beginPath(); ctx.arc(e.x, e.y, AEGIS_AURA_RADIUS, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(140, 190, 255, 0.16)";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 10]);
+    ctx.beginPath(); ctx.arc(e.x, e.y, AEGIS_AURA_RADIUS, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
   // ボマー：自爆が近づくと範囲の輪が縮んでいく
@@ -894,10 +907,10 @@ function drawEnemy(e) {
     ctx.stroke();
     ctx.restore();
   }
-  // スナイパーの照準線：予告中は細い線で示し、照準が固定される
-  // 最後の SNIPE_LOCK_TIME 秒は少し濃く・太くなる
-  if (e.type === "sniper" && e.snipeState === "aim") {
-    var sLocked = e.snipeTimer <= SNIPE_LOCK_TIME;
+  // スナイパー系の照準線：予告中は細い線で示し、照準が固定される
+  // 最後のロック時間は少し濃く・太くなる（デッドアイも同じ仕組み）
+  if ((e.type === "sniper" || e.type === "deadeye") && e.snipeState === "aim") {
+    var sLocked = e.snipeTimer <= (e.type === "deadeye" ? DEADEYE_LOCK_TIME : SNIPE_LOCK_TIME);
     ctx.save();
     ctx.strokeStyle = sLocked ? "rgba(182, 255, 46, 0.85)" : "rgba(182, 255, 46, 0.38)";
     ctx.lineWidth = sLocked ? 2 : 1;

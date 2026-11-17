@@ -32,6 +32,24 @@ function buildEnemySprite(t, flash) {
   var pts = shapePoints({ shape: t.shape, r: t.r, rot: 0 });
   return makeSprite(half * 2, half * 2, function (g) {
     var main = flash ? "#ffffff" : t.color;
+    // 上位種の装甲：本体の周囲（斜め4方向）に四角い装甲板を付ける
+    function drawEliteArmor() {
+      if (!t.elite) return;
+      var ad = t.r * 1.22, asz = t.r * 0.42;
+      g.save();
+      g.shadowColor = t.color; g.shadowBlur = 8;
+      g.lineWidth = 2.2; g.strokeStyle = main;
+      g.fillStyle = t.color; 
+      for (var ai = 0; ai < 4; ai++) {
+        var aa = Math.PI / 4 + ai * Math.PI / 2 + (t.shape === "star" ? 0.3 : 0);
+        var ax = Math.cos(aa) * ad, ay = Math.sin(aa) * ad;
+        g.save(); g.translate(ax, ay); g.rotate(aa + Math.PI / 4);
+        g.globalAlpha = 0.22; g.fillRect(-asz / 2, -asz / 2, asz, asz);
+        g.globalAlpha = 1; g.strokeRect(-asz / 2, -asz / 2, asz, asz);
+        g.restore();
+      }
+      g.restore();
+    }
     // フロスター（snowflake）も他の敵と共通の描き方にする：
     // shapePoints の12点星型（氷の結晶のシルエット）を、輪郭線＋
     // 半透明の塗り＋中心点で描く。枝線だけの線画にはしない。
@@ -80,8 +98,10 @@ function buildEnemySprite(t, flash) {
       g.stroke();
       return;
     }
-    if (t.shape === "guardian") {
-      // 本体（少し後ろの円＝半月形の胴）と、正面（上）の盾アーク
+    if (t.shape === "guardian" || t.shape === "aegis") {
+      // 本体（少し後ろの円＝半月形の胴）と、正面（上）の盾アーク。
+      // イージスは盾の角度が元の1.5倍（半角135°）まで広い。
+      var isAegis = t.shape === "aegis";
       g.shadowColor = t.color;
       g.shadowBlur = 14;
       g.lineWidth = 2.5;
@@ -97,10 +117,14 @@ function buildEnemySprite(t, flash) {
       g.lineWidth = 5;
       g.lineCap = "round";
       g.strokeStyle = flash ? "#ffffff" : "#9fd0ff";
-      g.beginPath(); g.arc(0, 0, t.r * 1.05, -Math.PI * 0.82, -Math.PI * 0.18); g.stroke();
+      g.beginPath();
+      if (isAegis) g.arc(0, 0, t.r * 1.05, -Math.PI * 1.25, Math.PI * 0.25);
+      else g.arc(0, 0, t.r * 1.05, -Math.PI * 0.82, -Math.PI * 0.18);
+      g.stroke();
       g.shadowBlur = 0;
       g.fillStyle = main;
       g.beginPath(); g.arc(0, 5, 3, 0, Math.PI * 2); g.fill();
+      drawEliteArmor();
       return;
     }
     g.shadowColor = t.color;
@@ -125,6 +149,7 @@ function buildEnemySprite(t, flash) {
     }
     g.fillStyle = main;
     g.beginPath(); g.arc(0, 0, 3, 0, Math.PI * 2); g.fill();
+    drawEliteArmor();
   });
 }
 var ENEMY_SPRITES = {};
@@ -255,7 +280,7 @@ function shapePoints(e) {
     // 十字（プラス）型：12点の輪郭
     var w = r * 0.38;
     pts = [[-w, -r], [w, -r], [w, -w], [r, -w], [r, w], [w, w], [w, r], [-w, r], [-w, w], [-r, w], [-r, -w], [-w, -w]];
-  } else if (e.shape === "circle" || e.shape === "guardian" || e.shape === "orb" || e.shape === "healer") {
+  } else if (e.shape === "circle" || e.shape === "guardian" || e.shape === "aegis" || e.shape === "orb" || e.shape === "healer") {
     for (i = 0; i < 20; i++) {
       a = i * Math.PI / 10;
       pts.push([Math.cos(a) * r, Math.sin(a) * r]);
