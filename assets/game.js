@@ -857,17 +857,19 @@ function boosterTailTarget(idx) {
   var want = (idx + 1) * DRONE_BOOSTER_GAP;
   return { x: player.x - Math.cos(player.angle) * want, y: player.y - Math.sin(player.angle) * want };
 }
-// 子機を目標点へ「ある程度の速度」で移動させる（全子機共通）。
-// 最高速度は DRONE_FOLLOW_SPEED（自機の通常速度より少し遅い）で、
-// 目標に近づくと距離に比例して減速し、滑らかに収まる。大きく
-// 引き離された時だけ上限を DRONE_FOLLOW_CATCHUP_SPEED まで上げ、
-// 置き去りになって破綻しないようにする。
+// 子機を目標点へ「ある程度の速度」で移動させる。
+// 最高速度は役割ごとに異なる（DRONE_FOLLOW_SPEEDS：アタッカー320／
+// ブースター300／スナイパー290／ガード280）。目標に近づくと距離に
+// 比例して減速し、滑らかに収まる。大きく引き離された時だけ上限を
+// DRONE_FOLLOW_CATCHUP_SPEED まで上げ（全役割共通）、置き去りに
+// なって破綻しないようにする。
 function moveDroneTo(d, tx, ty, dt) {
   var dx = tx - d.x, dy = ty - d.y;
   var dist = Math.sqrt(dx * dx + dy * dy);
   if (dist < 0.5) return;
-  var cap = dist > DRONE_FOLLOW_CATCHUP_DIST ? DRONE_FOLLOW_CATCHUP_SPEED : DRONE_FOLLOW_SPEED;
-  var spd = Math.min(cap, dist * (DRONE_FOLLOW_SPEED / DRONE_FOLLOW_ARRIVE_R));
+  var followSpeed = DRONE_FOLLOW_SPEEDS[d.role] || DRONE_FOLLOW_SPEEDS.booster;
+  var cap = dist > DRONE_FOLLOW_CATCHUP_DIST ? DRONE_FOLLOW_CATCHUP_SPEED : followSpeed;
+  var spd = Math.min(cap, dist * (followSpeed / DRONE_FOLLOW_ARRIVE_R));
   var step = Math.min(dist, spd * dt);
   d.x += dx / dist * step;
   d.y += dy / dist * step;
@@ -895,7 +897,7 @@ function updateDrones(dt) {
         }
       }
     }
-    // ---- 指定位置への追従（全役割共通の最高速度つき移動） ----
+    // ---- 指定位置への追従（役割ごとの最高速度つき移動） ----
     var tgt = d.role === "booster" ? boosterTailTarget(idx) : droneSlotTarget(d, idx);
     moveDroneTo(d, tgt.x, tgt.y, dt);
     d.x = clamp(d.x, 8, WORLD_W - 8); d.y = clamp(d.y, 8, WORLD_H - 8);
