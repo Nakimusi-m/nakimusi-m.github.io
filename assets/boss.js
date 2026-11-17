@@ -303,7 +303,7 @@ function updateIceShots(dt) {
     s.y = s.sy + (s.ty - s.sy) * k;
     var pdx = player.x - s.x, pdy = player.y - s.y;
     if (player.invincible <= 0 && pdx * pdx + pdy * pdy < (player.r + 11) * (player.r + 11)) {
-      damagePlayer(BOSS_ICE_DMG);
+      damagePlayer(BOSS_ICE_DMG, s.x, s.y);
       landIceShot(s);
       iceShots.splice(i, 1);
       continue;
@@ -325,7 +325,10 @@ function destroyTurret(tr) {
   score += BOSS_SCORE_TURRET;
   burst(tr.x, tr.y, "#7fd8ff", 22);
   spawnRing(tr.x, tr.y, "#7fd8ff", 4);
+  spawnRing(tr.x, tr.y, "#ffffff", 2); // 大型撃破の小さな衝撃波
+  hitStop = BIG_KILL_HITSTOP; // 大型撃破の短いヒットストップ
   spawnSparks(tr.x, tr.y, "#d8f6ff", 9);
+  sfxExplosionTier(2);
   if (popups.length >= MAX_POPUPS) popups.shift();
   popups.push({ x: tr.x, y: tr.y - 10, text: "+" + BOSS_SCORE_TURRET, life: 0.8, maxLife: 0.8, pop: 1, big: true, color: "#7fd8ff" });
   shake = Math.max(shake, 16);

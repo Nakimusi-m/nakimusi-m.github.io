@@ -49,18 +49,69 @@ function noiseBurst(dur, cutoff, gain) {
   src.connect(f); f.connect(g); g.connect(audioCtx.destination);
   src.start(t); src.stop(t + dur);
 }
-function sfxExplosion(big) {
+// 撃破音は敵の大きさで3段階：0=小（高く軽く）／1=中／2=大・上位種（低く重く）
+function sfxExplosionTier(tier) {
   if (!soundOn || !audioCtx) return;
-  // 同時多発時は音が重なりすぎるので最小間隔を空ける
   var now = performance.now();
   if (now - lastExplAt < 30) return;
   lastExplAt = now;
   var step = Math.min(comboCount, 24);
-  var mul = 1 + step * 0.035; // コンボで少しずつ高く
-  tone((big ? 300 : 430) * mul, 42, big ? 0.32 : 0.2, "square", big ? 0.11 : 0.06);
-  tone((big ? 150 : 210) * mul, 36, big ? 0.36 : 0.22, "triangle", big ? 0.12 : 0.07);
-  noiseBurst(big ? 0.34 : 0.2, big ? 950 : 1500, big ? 0.15 : 0.08);
-  if (comboCount >= 2) tone(660 * mul, 880 * mul, 0.09, "sine", 0.045); // コンボのキラッという音
+  var mul = 1 + step * 0.035;
+  if (tier >= 2) {
+    tone(210 * mul, 34, 0.38, "square", 0.13);
+    tone(105 * mul, 30, 0.42, "triangle", 0.14);
+    noiseBurst(0.4, 750, 0.17);
+  } else if (tier === 1) {
+    tone(360 * mul, 40, 0.26, "square", 0.085);
+    tone(180 * mul, 34, 0.28, "triangle", 0.09);
+    noiseBurst(0.26, 1200, 0.11);
+  } else {
+    tone(620 * mul, 70, 0.14, "square", 0.045);
+    tone(310 * mul, 60, 0.15, "triangle", 0.05);
+    noiseBurst(0.13, 2100, 0.05);
+  }
+  if (comboCount >= 2) tone(660 * mul, 880 * mul, 0.09, "sine", 0.045);
+}
+function sfxExplosion(big) { sfxExplosionTier(big ? 2 : 0); }
+// カプセル出現：短い電子音（小さな閃光に合わせる）
+function sfxCapsuleSpawn() {
+  if (!soundOn || !audioCtx) return;
+  tone(1180, 1760, 0.08, "sine", 0.04);
+}
+// カプセル取得：役割ごとに音程を変える（アタッカー低め→スナイパー高め等）
+var PICKUP_BASE = { attacker: 740, guard: 880, booster: 988, sniper: 1175 };
+function sfxPickupRole(role) {
+  if (!soundOn || !audioCtx) return;
+  var base = PICKUP_BASE[role] || 880;
+  tone(base, base, 0.07, "square", 0.055);
+  setTimeout(function () { tone(base * 1.5, base * 1.5, 0.1, "square", 0.055); }, 55);
+}
+// 子機復帰：修理完了の柔らかい音
+function sfxDroneRevive() {
+  if (!soundOn || !audioCtx) return;
+  tone(520, 780, 0.14, "sine", 0.05);
+  setTimeout(function () { tone(780, 1040, 0.12, "sine", 0.04); }, 80);
+}
+// ベスト更新のファンファーレ（短い3音）
+function sfxFanfare() {
+  if (!soundOn || !audioCtx) return;
+  tone(784, 784, 0.1, "square", 0.06);
+  setTimeout(function () { tone(988, 988, 0.1, "square", 0.06); }, 90);
+  setTimeout(function () { tone(1318, 1568, 0.2, "square", 0.07); }, 180);
+}
+// ボマーの爆破予告ビープ：予告の進み具合（0→1）で音程が上がる
+function sfxBomberBeep(progress) {
+  if (!soundOn || !audioCtx) return;
+  var f = 880 + progress * 520;
+  tone(f, f, 0.06, "square", 0.05);
+}
+// アークの電気音：距離が近いほど大きく（呼び出し側で間引く）
+function sfxArcCrackle(dist) {
+  if (!soundOn || !audioCtx) return;
+  var k = clamp(1 - dist / ARC_CRACKLE_RANGE, 0, 1);
+  if (k <= 0) return;
+  noiseBurst(0.05, 3200, 0.012 + k * 0.035);
+  tone(rand(1800, 2600), rand(900, 1400), 0.04, "sawtooth", 0.006 + k * 0.016);
 }
 function sfxHit() { tone(200, 60, 0.22, "sawtooth", 0.12); }
 // オーバードライブ発動：上昇するアルペジオで「解放」を知らせる
