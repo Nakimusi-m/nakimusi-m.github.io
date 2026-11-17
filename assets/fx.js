@@ -128,15 +128,20 @@ function killEnemy(e) {
     if (odGauge >= 100) activateOverdrive();
   }
   // 子機カプセルのドロップ（ボス戦中は発生しない）：
-  // スパイラル→アタッカー、ガーディアン→ガード、アンプ→ブースター、
-  // スナイパー→スナイパーは100%、タンクはランダム（白銀のカプセル、
-  // 中身は拾うまで分からない。候補は全役割）。
+  // 元の4種（スパイラル→アタッカー、ガーディアン→ガード、アンプ→
+  // ブースター、スナイパー→スナイパー）は DRONE_DROP_PROB（20%）。
+  // 上位種3体（サイクロン→アタッカー、イージス→ガード、デッドアイ→
+  // スナイパー）は確定（100%）。タンクはドロップしない。
   if (!boss) {
-    if (e.type === "spiral") spawnCapsule(e.x, e.y, "attacker");
-    else if (e.type === "guardian") spawnCapsule(e.x, e.y, "guard");
-    else if (e.type === "amp") spawnCapsule(e.x, e.y, "booster");
-    else if (e.type === "sniper") spawnCapsule(e.x, e.y, "sniper");
-    else if (e.type === "tank") spawnCapsule(e.x, e.y, "random");
+    if (e.type === "cyclone") spawnCapsule(e.x, e.y, "attacker");
+    else if (e.type === "aegis") spawnCapsule(e.x, e.y, "guard");
+    else if (e.type === "deadeye") spawnCapsule(e.x, e.y, "sniper");
+    else if (Math.random() < DRONE_DROP_PROB) {
+      if (e.type === "spiral") spawnCapsule(e.x, e.y, "attacker");
+      else if (e.type === "guardian") spawnCapsule(e.x, e.y, "guard");
+      else if (e.type === "amp") spawnCapsule(e.x, e.y, "booster");
+      else if (e.type === "sniper") spawnCapsule(e.x, e.y, "sniper");
+    }
   }
   var big = e.maxHp >= 3;
   // コンボ：短い間隔で倒し続けると伸びる（表示と音程のみ。スコア倍率は付けない）
@@ -231,7 +236,7 @@ function bomberBlast(e) {
   for (i = 0; i < targets.length; i++) {
     var t = targets[i];
     if (t.dead) continue;
-    t.hp -= BOMBER_ENEMY_DMG;
+    t.hp -= BOMBER_ENEMY_DMG * aegisDamageMul(t); // イージスのオーラ圏内は20%カット
     t.flash = 0.09;
     if (t.hp <= 0) killEnemy(t); // ボマーなら killEnemy 内でさらに誘爆
   }

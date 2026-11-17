@@ -38,6 +38,10 @@ function spawnEnemy(typeName, x, y, headingDeg, opts) {
     rotates: t.shape !== "diamond",
     dashState: "approach", dashTimer: 0, dashCooldown: rand(DASH_INITIAL_COOLDOWN[0], DASH_INITIAL_COOLDOWN[1]),
     dashVx: 0, dashVy: 0,
+    keepRange: t.keepRange || 0,
+    shieldHalf: t.shieldHalf != null ? t.shieldHalf : GUARDIAN_SHIELD_HALF,
+    burstLeft: 0,
+    spiralDir: Math.random() < 0.5 ? -1 : 1, // サイクロンの自転方向（公転方向とは独立にランダム）
     spiralAngle: rand(0, Math.PI * 2),
     shieldFlash: 0,
     fuse: -1, blastDone: false,
@@ -54,7 +58,7 @@ function spawnEnemy(typeName, x, y, headingDeg, opts) {
     fireInterval: t.fireInterval ? rand(t.fireInterval[0], t.fireInterval[1]) : 0,
     fireTimer: rand(0.7, 1.4),
     rot: rand(0, Math.PI * 2),
-    rotSpeed: typeName === "spiral" ? rand(1.8, 2.4) : rand(-0.7, 0.7),
+    rotSpeed: typeName === "spiral" ? rand(1.8, 2.4) : (typeName === "cyclone" ? rand(1.8, 2.4) : rand(-0.7, 0.7)),
     flash: 0,
     aimed: (opts.attack || t.attack) === "aimed"
   };
@@ -142,6 +146,14 @@ function spawnArcGroup(p) {
   }
 }
 
+// 上位種への格上げ：ELITE_UNLOCK_TIME 以降、対象3種の出現抽選のうち
+// ELITE_UPGRADE_PROB の割合で上位種に差し替える（ボス戦中は通常湧き
+// 自体が止まっているため、上位種も出現しない）。
+function eliteUpgrade(baseType, eliteType) {
+  if (elapsed >= ELITE_UNLOCK_TIME && Math.random() < ELITE_UPGRADE_PROB) return eliteType;
+  return baseType;
+}
+
 // ---- 生成ディレクター：時間経過で少しずつ激しくなる ----
 var director = { timer: 0.6 };
 function directorUpdate(dt) {
@@ -181,11 +193,11 @@ function directorUpdate(dt) {
       }
     }
     else if (nr < NEW_MIX.splitter) spawnEnemy("splitter", p.x, p.y, toPlayer + rand(-16, 16));
-    else if (nr < NEW_MIX.spiral) spawnEnemy("spiral", p.x, p.y, toPlayer + rand(-14, 14));
-    else if (nr < NEW_MIX.guardian) spawnEnemy("guardian", p.x, p.y, toPlayer + rand(-14, 14));
+    else if (nr < NEW_MIX.spiral) spawnEnemy(eliteUpgrade("spiral", "cyclone"), p.x, p.y, toPlayer + rand(-14, 14));
+    else if (nr < NEW_MIX.guardian) spawnEnemy(eliteUpgrade("guardian", "aegis"), p.x, p.y, toPlayer + rand(-14, 14));
     else if (nr < NEW_MIX.bomber) spawnEnemy("bomber", p.x, p.y, toPlayer + rand(-18, 18));
     else if (nr < NEW_MIX.froster) spawnEnemy("froster", p.x, p.y, toPlayer + rand(-18, 18));
-    else if (nr < NEW_MIX.sniper) spawnEnemy("sniper", p.x, p.y, toPlayer + rand(-14, 14));
+    else if (nr < NEW_MIX.sniper) spawnEnemy(eliteUpgrade("sniper", "deadeye"), p.x, p.y, toPlayer + rand(-14, 14));
     else spawnEnemy("amp", p.x, p.y, toPlayer + rand(-14, 14));
     return;
   }
@@ -533,11 +545,15 @@ function update(dt) {
         // ガーディアンの正面ガード：進行方向の正面側から当たった弾は
         // 盾で無効化される。背後側から当たった弾だけが通る。
         // ただし貫通弾は盾ごと貫いてダメージが通る。
-        if (e.type === "guardian" && !b.pierce) {
-          // 盾の向きは旋回上限付きの faceAngle 基準（移動方向とは独立）
+        if ((e.type === "guardian" || e.type === "aegis") && !b.pierce) {
+          // 盾の向きは旋回上限付きの faceAngle 基準（移動方向とは独立）。
+          // 盾の範囲は shieldHalf（半角）で決まる：ガーディアン90°、
+          // イージスはその1.5倍の135°。命中点の方向がその範囲内なら防ぐ。
           var shieldA = e.faceAngle != null ? e.faceAngle : e.dirAngle;
           var front = dx * Math.cos(shieldA) + dy * Math.sin(shieldA);
-          if (front > 0) {
+          var hitDist = Math.sqrt(dx * dx + dy * dy) || 1;
+          var shieldCos = Math.cos(e.shieldHalf != null ? e.shieldHalf : GUARDIAN_SHIELD_HALF);
+          if (front / hitDist > shieldCos) {
             b.dead = true;
             e.shieldFlash = 0.16;
             spawnSparks(hitX, hitY, "#9fd0ff", 3);
@@ -554,7 +570,8 @@ function update(dt) {
         }
         if (b.pierce) b.hitUids[e.uid] = true; // この敵にはもう当たらない
         else b.dead = true;
-        e.hp -= b.dmg; // 通常弾は BULLET_DAMAGE（0.25）、発動中は2倍
+        // イージスの防御オーラ：範囲内の敵は被ダメージ20%カット（重複なし）
+        e.hp -= b.dmg * aegisDamageMul(e); // 通常弾は BULLET_DAMAGE（0.25）、発動中は2倍
         e.flash = 0.09; // 命中フラッシュ（白いスプライトへ切替）
         spawnSparks(hitX, hitY, e.color, 3); // 命中時の小さな火花
         if (e.hp <= 0) killEnemy(e);
