@@ -3,6 +3,7 @@
    サウンド（WebAudioの小さな電子音）
    ============================================================ */
 var audioCtx = null, soundOn = true;
+var masterVolume = 0.8; // 設定パネルの音量スライダー（0〜1）。効果音全体に掛かる
 function ensureAudio() {
   if (!audioCtx) {
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (err) { audioCtx = null; }
@@ -16,7 +17,7 @@ function tone(freqFrom, freqTo, dur, type, gain) {
   osc.type = type;
   osc.frequency.setValueAtTime(freqFrom, t);
   osc.frequency.exponentialRampToValueAtTime(Math.max(freqTo, 1), t + dur);
-  g.gain.setValueAtTime(gain, t);
+  g.gain.setValueAtTime(gain * masterVolume, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   osc.connect(g); g.connect(audioCtx.destination);
   osc.start(t); osc.stop(t + dur);
@@ -43,7 +44,7 @@ function noiseBurst(dur, cutoff, gain) {
   f.frequency.setValueAtTime(cutoff, t);
   f.frequency.exponentialRampToValueAtTime(120, t + dur);
   var g = audioCtx.createGain();
-  g.gain.setValueAtTime(gain, t);
+  g.gain.setValueAtTime(gain * masterVolume, t);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
   src.connect(f); f.connect(g); g.connect(audioCtx.destination);
   src.start(t); src.stop(t + dur);

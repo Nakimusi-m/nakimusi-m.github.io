@@ -37,16 +37,8 @@
             <div class="hud-value" id="time">0:00</div>
           </div>
           <div class="hud-btns">
-            <button class="icon-btn" id="btn-sound" aria-label="サウンドのオン・オフ">
-              <svg viewBox="0 0 24 24" id="ic-sound-on"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16 9c1.2 1.6 1.2 4.4 0 6"/><path d="M18.5 6.5c2.4 3 2.4 8 0 11"/></svg>
-              <svg viewBox="0 0 24 24" id="ic-sound-off" style="display:none"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" stroke="none"/><path d="M16.5 9.5l5 5M21.5 9.5l-5 5"/></svg>
-            </button>
-            <button class="icon-btn" id="btn-fs" aria-label="全画面（横向き固定）">
-              <svg viewBox="0 0 24 24" id="ic-fs-expand"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-              <svg viewBox="0 0 24 24" id="ic-fs-shrink" style="display:none"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>
-            </button>
-            <button class="icon-btn" id="btn-pause" aria-label="一時停止">
-              <svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14" stroke-width="3"/></svg>
+            <button class="icon-btn" id="btn-settings" aria-label="設定を開く">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>
             </button>
           </div>
         </div>
@@ -62,38 +54,100 @@
       </div>
 
       <div class="overlay" id="ov-title">
-        <h1 class="game-title">NEON <span class="accent">STRIKER</span></h1>
-        <p class="tagline">全方位ツインスティック・スコアアタック</p>
-        <p class="rotate-note">下の「全画面で遊ぶ」ボタンで横向きに固定できます</p>
-        <ul class="howto">
-          <li><span class="k">LEFT STICK</span>画面左半分をドラッグ ― 移動</li>
-          <li><span class="k">RIGHT STICK</span>画面右半分をドラッグ ― その向きを向いて、傾けている間撃ち続ける</li>
-          <li class="weapon-row"><span class="k">WEAPON</span>ツインノズル ― 弾を2本同時発射・連射速度2倍（1発のダメージは小さめ）</li>
-          <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 弾速3倍・貫通・ダメージ2倍。ブースター子機が多いほど長く続き、ノズルも2本→最大5本に増える</li>
-          <li class="drone-row"><span class="k">DRONE</span>子機カプセル：スパイラル→アタッカー（散弾・斜め前方・最大2）／ガーディアン→ガード（シールド展開中は圏内の被ダメージ30%カット／台・斜め後方・最大2。シールドは敵弾を防ぐが20発で割れ、18秒後に全回復して自動で張り直される。割れている間は軽減なし）／アンプ→ブースター（OD強化・後ろに尾行・最大3）／敵スナイパー→スナイパー（長射程の単発狙撃・照準線つき・斜め後方・最大2）。タンクはランダム（全役割から）。シアンの輪が味方の目印です（味方の弾はシアン〜白、敵の弾は赤〜マゼンタ）</li>
-          <li class="drone-row"><span class="k">DRONE HP</span>子機は敵弾を体で防ぐが、アタッカー／スナイパー／ブースターは6発・ガードは9発で機能停止し、30秒で復帰。オーバードライブでは回復しない。満員の役割のパーツを拾うと、停止中（残り時間の長い順）や損傷中の子機がその場で修理される</li>
-          <li class="pc-row"><span class="k">PC</span>WASD／矢印キーで移動、マウスで狙ってクリックで射撃</li>
-          <li class="boss-row"><span class="k">BOSS</span>90秒ごとに要塞ボス「ペルマフロスト」出現 ― 本体にも攻撃は通るが、砲塔が残るほど軽減される（2機でダメージ1/4・1機で1/2・0機で等倍）。砲塔を先に壊せば第2段階へ、残したまま本体を倒し切っても処刑タイムへ（その場合、残った砲塔は無力化され得点は入らない）。ボス戦中はゲージが貯まらない</li>
-          <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
-        </ul>
-        <div class="enemy-legend" id="enemy-legend">
-          <p class="legend-note">敵図鑑 ― 耐久は通常弾（1発＝0.25ダメージ）換算の発数です</p>
-        </div>
-        <div class="diff-select">
-          <span class="diff-label">DIFFICULTY</span>
-          <div class="diff-btns" role="group" aria-label="難易度">
-            <button class="diff-btn" data-diff="veryeasy">ベリーイージー</button>
-            <button class="diff-btn" data-diff="easy">イージー</button>
-            <button class="diff-btn selected" data-diff="normal">ノーマル</button>
+        <div class="falling-layer" id="falling-layer" aria-hidden="true"></div>
+        <div class="title-center">
+          <h1 class="game-title">NEON <span class="accent">STRIKER</span></h1>
+          <p class="tagline">全方位ツインスティック・スコアアタック</p>
+          <p class="rotate-note">下の「全画面で遊ぶ」ボタンで横向きに固定できます</p>
+          <div class="diff-select">
+            <span class="diff-label">DIFFICULTY</span>
+            <div class="diff-btns" role="group" aria-label="難易度">
+              <button class="diff-btn" data-diff="veryeasy">ベリーイージー</button>
+              <button class="diff-btn" data-diff="easy">イージー</button>
+              <button class="diff-btn selected" data-diff="normal">ノーマル</button>
+            </div>
+            <span class="diff-note">敵と敵弾の速さだけが変わります</span>
           </div>
-          <span class="diff-note">敵と敵弾の速さだけが変わります</span>
+          <div class="btn-row">
+            <button class="big-btn" id="btn-start">START</button>
+            <button class="sub-btn" id="btn-fs-title">
+              <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              全画面で遊ぶ
+            </button>
+          </div>
         </div>
-        <div class="btn-row">
-          <button class="big-btn" id="btn-start">START</button>
-          <button class="sub-btn" id="btn-fs-title">
-            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-            全画面で遊ぶ
-          </button>
+        <div class="title-corner">
+          <button class="corner-btn" id="btn-open-howto">操作方法</button>
+          <button class="corner-btn" id="btn-open-zukan">敵図鑑</button>
+          <button class="corner-btn" id="btn-open-settings-title">設定</button>
+        </div>
+      </div>
+
+      <div class="panel-overlay" id="ov-howto" hidden>
+        <div class="panel panel-howto">
+          <div class="panel-head">
+            <h2 class="panel-title">操作方法</h2>
+            <button class="panel-close" data-close="ov-howto" aria-label="閉じる">× 閉じる</button>
+          </div>
+          <div class="panel-body">
+            <ul class="howto">
+              <li><span class="k">LEFT STICK</span>画面左半分をドラッグ ― 移動</li>
+              <li><span class="k">RIGHT STICK</span>画面右半分をドラッグ ― その向きを向いて、傾けている間撃ち続ける</li>
+              <li class="weapon-row"><span class="k">WEAPON</span>ツインノズル ― 弾を2本同時発射・連射速度2倍（1発のダメージは小さめ）</li>
+              <li class="od-row"><span class="k">OVERDRIVE</span>敵を倒してゲージ満タンで自動発動 ― 弾速3倍・貫通・ダメージ2倍。ブースター子機が多いほど長く続き、ノズルも2本→最大5本に増える</li>
+              <li class="drone-row"><span class="k">DRONE</span>子機カプセル：スパイラル→アタッカー（散弾・斜め前方・最大2）／ガーディアン→ガード（シールド展開中は圏内の被ダメージ30%カット／台・斜め後方・最大2。シールドは敵弾を防ぐが20発で割れ、18秒後に全回復して自動で張り直される。割れている間は軽減なし）／アンプ→ブースター（OD強化・後ろに尾行・最大3）／敵スナイパー→スナイパー（長射程の単発狙撃・照準線つき・斜め後方・最大2）。タンクはランダム（全役割から）。シアンの輪が味方の目印です（味方の弾はシアン〜白、敵の弾は赤〜マゼンタ）</li>
+              <li class="drone-row"><span class="k">DRONE HP</span>子機は敵弾を体で防ぐが、アタッカー／スナイパー／ブースターは6発・ガードは9発で機能停止し、30秒で復帰。オーバードライブでは回復しない。満員の役割のパーツを拾うと、停止中（残り時間の長い順）や損傷中の子機がその場で修理される</li>
+              <li class="pc-row"><span class="k">PC</span>WASD／矢印キーで移動、マウスで狙ってクリックで射撃</li>
+              <li class="boss-row"><span class="k">BOSS</span>90秒ごとに要塞ボス「ペルマフロスト」出現 ― 本体にも攻撃は通るが、砲塔が残るほど軽減される（2機でダメージ1/4・1機で1/2・0機で等倍）。砲塔を先に壊せば第2段階へ、残したまま本体を倒し切っても処刑タイムへ（その場合、残った砲塔は無力化され得点は入らない）。ボス戦中はゲージが貯まらない</li>
+              <li class="goal-row"><span class="k">GOAL</span>広いフィールドを動き回り、全方向から来る敵を倒して生き残る</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-overlay" id="ov-zukan" hidden>
+        <div class="panel panel-zukan">
+          <div class="panel-head">
+            <h2 class="panel-title">敵図鑑</h2>
+            <button class="panel-close" data-close="ov-zukan" aria-label="閉じる">× 閉じる</button>
+          </div>
+          <p class="zukan-note">耐久は通常弾（1発＝0.25ダメージ）換算の発数です ― 横にスクロールして全16項目を見られます</p>
+          <div class="zukan-scroll">
+            <div class="enemy-legend" id="enemy-legend"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-overlay" id="ov-settings" hidden>
+        <div class="panel panel-settings">
+          <div class="panel-head">
+            <h2 class="panel-title">設定</h2>
+            <button class="panel-close" id="btn-close-settings" aria-label="閉じる">× 閉じる</button>
+          </div>
+          <div class="settings-tabs" role="tablist" aria-label="設定タブ">
+            <button class="stab-btn selected" id="tab-btn-volume" data-tab="volume" role="tab">音量</button>
+            <button class="stab-btn" id="tab-btn-display" data-tab="display" role="tab">画面・その他</button>
+          </div>
+          <div class="settings-pane" id="pane-volume">
+            <div class="vol-row">
+              <label class="vol-label" for="vol-range">音量</label>
+              <input type="range" id="vol-range" min="0" max="100" step="1" value="80" />
+              <span class="vol-value" id="vol-value">80%</span>
+            </div>
+            <button class="setting-action" id="btn-mute">サウンド：ON</button>
+            <p class="setting-note">音量は効果音全体に適用されます。0にすると無音になります。</p>
+          </div>
+          <div class="settings-pane" id="pane-display" hidden>
+            <button class="setting-action" id="btn-fs-settings">
+              <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              <span id="fs-settings-label">全画面にする（横向き固定）</span>
+            </button>
+            <div id="settings-game-actions" hidden>
+              <button class="setting-action" id="btn-restart">リスタート</button>
+              <button class="setting-action danger" id="btn-to-title">タイトルへ戻る</button>
+            </div>
+            <p class="setting-note">設定を開いている間、ゲームは一時停止します。</p>
+          </div>
         </div>
       </div>
 
@@ -135,6 +189,7 @@
     <script src="assets/game.js"></script>
     <script src="assets/render.js"></script>
     <script src="assets/input.js"></script>
+    <script src="assets/titlebg.js"></script>
     <script src="assets/main.js"></script>
   </body>
 </html>
