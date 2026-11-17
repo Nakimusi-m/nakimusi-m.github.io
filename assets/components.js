@@ -139,12 +139,13 @@ registerMovement("dash", function (e, dt) {
   // 距離維持（スナイパー）：自機と約 SNIPER_RANGE の間合いを保つ。
   // 遠ければ近づき、近ければ下がり、間合いの中ではゆっくり横へ流れる。
 registerMovement("keepDistance", function (e, dt) {
+    var keepRange = e.keepRange || SNIPER_RANGE;
     var dx = player.x - e.bx, dy = player.y - e.by;
     var len = Math.sqrt(dx * dx + dy * dy) || 1;
     e.dirAngle = Math.atan2(dy, dx);
     var radial = 0;
-    if (len > SNIPER_RANGE + 30) radial = 1;
-    else if (len < SNIPER_RANGE - 30) radial = -1;
+    if (len > keepRange + 30) radial = 1;
+    else if (len < keepRange - 30) radial = -1;
     e.phase += dt * 0.6;
     var strafe = Math.sin(e.phase) * 0.35;
     e.vx = (dx / len * radial + (-dy / len) * strafe) * e.speed;
@@ -185,6 +186,30 @@ registerMovement("healerKeep", function (e, dt) {
     e.vy = (dy / len * radial * radialMul + (dx / len) * strafe) * e.speed;
     e.bx += e.vx * dt;
     e.by += e.vy * dt;
+    e.x = e.bx; e.y = e.by;
+});
+  // 公転（サイクロン）：自機を中心とした大きな円軌道を衛星のように回る。
+  // 中心は常に自機の現在位置。出現後はまず軌道に乗るよう半径方向へ補正し、
+  // 軌道上では接線方向へ進み続ける（自機へ突っ込む動きはしない）。
+  // 公転方向（orbitDir）は個体ごとにランダム。接線速度は e.speed
+  // （＝CYCLONE_ORBIT_SPEED に難易度倍率と時間カーブを適用済み）。
+registerMovement("orbitPlayer", function (e, dt) {
+    var dx = e.bx - player.x, dy = e.by - player.y;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    var rx = dx / len, ry = dy / len; // 自機から見た半径方向
+    var dir = e.orbitDir || 1;
+    var tx = -ry * dir, ty = rx * dir; // 接線方向（公転方向）
+    // 半径のずれを補正：外側なら内へ、内側なら外へ。ずれが大きいほど強く、
+    // 接線速度を超えない範囲で寄せ、軌道に乗れば補正はほぼ消える。
+    var err = len - CYCLONE_ORBIT_RADIUS;
+    var radialSpeed = clamp(err * 1.6, -e.speed, e.speed); // 正＝内向きへの補正量
+    e.vx = tx * e.speed - rx * radialSpeed;
+    e.vy = ty * e.speed - ry * radialSpeed;
+    e.bx += e.vx * dt;
+    e.by += e.vy * dt;
+    e.bx = clamp(e.bx, 20, WORLD_W - 20);
+    e.by = clamp(e.by, 20, WORLD_H - 20);
+    e.dirAngle = Math.atan2(e.vy, e.vx);
     e.x = e.bx; e.y = e.by;
 });
   // 三角形編隊（アーク）：3体が共有する中心点（arc グループ）を自機へ
@@ -346,6 +371,15 @@ registerAttack("spiral", function (e) {
     e.spiralAngle = (e.spiralAngle || 0) + SPIRAL_ANGLE_STEP;
     spawnEnemyBullet(e.x, e.y, Math.cos(e.spiralAngle), Math.sin(e.spiralAngle), EBULLET_SPEED + SPIRAL_SPEED_DELTA, SPIRAL_DMG);
 });
+  // 二重螺旋（サイクロン）：発射角が少しずつ回り、対向する2方向へ同時に撒く。
+  // 自転の向き（spiralDir）は個体ごとにランダムで、公転方向とは独立。
+  // 弾速・威力（-5）は元のスパイラルと同じ。発射間隔は敵定義側で元の約0.8倍。
+registerAttack("doubleSpiral", function (e) {
+    var dir = e.spiralDir || 1;
+    e.spiralAngle = (e.spiralAngle || 0) + SPIRAL_ANGLE_STEP * dir;
+    spawnEnemyBullet(e.x, e.y, Math.cos(e.spiralAngle), Math.sin(e.spiralAngle), EBULLET_SPEED + SPIRAL_SPEED_DELTA, SPIRAL_DMG);
+    spawnEnemyBullet(e.x, e.y, Math.cos(e.spiralAngle + Math.PI), Math.sin(e.spiralAngle + Math.PI), EBULLET_SPEED + SPIRAL_SPEED_DELTA, SPIRAL_DMG);
+});
   // 狙撃（スナイパー）：照準線で予告してから高速弾を1発撃つ。
   // 予告の間は snipeAngle が自機を追うが、発射の SNIPE_LOCK_TIME 秒前
   // からはその向きで固定される（動けば避けられる）。状態遷移を進める
@@ -371,6 +405,57 @@ registerAttack("snipe", function (e, dt) {
       e.fireTimer = 0.001;
     }
 });
+  // 狙撃・上位（デッドアイ）：予告0.6秒のあと高速弾を0.15秒間隔で2連射。
+  // サイクル全体が元の約0.7倍になるよう、クールダウンは DEADEYE_COOLDOWN。
+registerAttack("deadsnipe", function (e, dt) {
+    dt = dt || 0.016;
+    if (e.snipeState === "burst") {
+      e.snipeTimer -= dt;
+      e.fireTimer = 0.001;
+      if (e.snipeTimer <= 0) {
+        if (e.burstLeft > 0) {
+          spawnEnemyBullet(e.x, e.y, Math.cos(e.snipeAngle), Math.sin(e.snipeAngle), EBULLET_SPEED * SNIPER_BULLET_SPEED_MUL);
+          e.burstLeft--;
+          e.snipeTimer = DEADEYE_BURST_INTERVAL;
+        }
+        if (e.burstLeft <= 0) { e.snipeState = "cool"; e.fireTimer = DEADEYE_COOLDOWN; }
+      }
+      return;
+    }
+    if (e.snipeState !== "aim") {
+      e.snipeState = "aim";
+      e.snipeTimer = DEADEYE_TELEGRAPH_TIME;
+      e.snipeAngle = Math.atan2(player.y - e.y, player.x - e.x);
+      e.fireTimer = 0.001;
+      return;
+    }
+    e.snipeTimer -= dt;
+    if (e.snipeTimer > DEADEYE_LOCK_TIME) {
+      e.snipeAngle = Math.atan2(player.y - e.y, player.x - e.x);
+    }
+    if (e.snipeTimer <= 0) {
+      spawnEnemyBullet(e.x, e.y, Math.cos(e.snipeAngle), Math.sin(e.snipeAngle), EBULLET_SPEED * SNIPER_BULLET_SPEED_MUL);
+      e.burstLeft = DEADEYE_BURST_COUNT - 1;
+      e.snipeState = "burst";
+      e.snipeTimer = DEADEYE_BURST_INTERVAL;
+      e.fireTimer = 0.001;
+    } else {
+      e.fireTimer = 0.001;
+    }
+});
+// イージスの防御オーラ：対象の敵が、いずれかのイージス（自身を除く）の
+// 半径 AEGIS_AURA_RADIUS 内にいれば被ダメージ倍率 1-AEGIS_AURA_CUT を返す。
+// 複数のイージスが重なってもカットは重複しない（最初に見つけた時点で確定）。
+// ボスは enemies に含まれないため自然に対象外。
+function aegisDamageMul(target) {
+  for (var i = 0; i < enemies.length; i++) {
+    var o = enemies[i];
+    if (o === target || o.dead || o.type !== "aegis") continue;
+    var dx = target.x - o.x, dy = target.y - o.y;
+    if (dx * dx + dy * dy <= AEGIS_AURA_RADIUS * AEGIS_AURA_RADIUS) return 1 - AEGIS_AURA_CUT;
+  }
+  return 1;
+}
   // パルス（アンプ）：周囲の敵へ「移動速度+20%（3秒）」と「パルスの
   // 瞬間のダメージ無効化（0.5秒）」を付与する。対象はアンプ自身と
   // 他のアンプを除くすべての敵（タンク・ボマー・フロスター等も含む）。
