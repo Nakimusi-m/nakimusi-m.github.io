@@ -44,6 +44,12 @@ function spawnEnemy(typeName, x, y, headingDeg, opts) {
     snipeState: null, snipeTimer: 0, snipeAngle: 0,
     buffTimer: 0, invulnTimer: 0, buffFrom: null, moveMul: 1, frosted: false,
     pulseT: 0, orbitDir: Math.random() < 0.5 ? -1 : 1,
+    // アークの編隊（arcOrbit部品用）：グループ共有オブジェクトと自分の枠番号
+    arc: opts.arcGroup || null, arcSlot: opts.arcSlot || 0,
+    // ステッパーの歩行（step部品用）：歩幅は個体ごとにスポーン時決定し固定
+    stepDist: typeName === "stepper" ? rand(STEPPER_STEP_MIN, STEPPER_STEP_MAX) : 0,
+    stepState: "pause", stepTimer: rand(0.05, STEPPER_PAUSE_TIME), stepT: 0, stepDur: STEPPER_MOVE_TIME,
+    stepFromX: x, stepFromY: y, stepDirX: 0, stepDirY: 0, stepDistEff: 0, ghostTimer: 0,
     attackFn: Attack[opts.attack || t.attack],
     fireInterval: t.fireInterval ? rand(t.fireInterval[0], t.fireInterval[1]) : 0,
     fireTimer: rand(0.7, 1.4),
@@ -94,6 +100,23 @@ function spawnPointFar(minDist, others) {
   return best;
 }
 
+// アークの出現：3体セットを1回の出現として出す。3体は中心点を共有し、
+// 初期配置はその時点の伸縮半径で三角形に置く（以降の位置は arcOrbit
+// 部品が毎フレーム決める）。中心点は出現点そのもの。
+function spawnArcGroup(p) {
+  var group = { cx: p.x, cy: p.y, angle: rand(0, Math.PI * 2), pulseT: rand(0, ARC_PULSE_PERIOD), stampT: -1 };
+  var mid = (ARC_RADIUS_MIN + ARC_RADIUS_MAX) / 2;
+  var ampR = (ARC_RADIUS_MAX - ARC_RADIUS_MIN) / 2;
+  var radius = mid + Math.sin(group.pulseT * Math.PI * 2 / ARC_PULSE_PERIOD) * ampR;
+  for (var i = 0; i < ARC_GROUP_SIZE; i++) {
+    var a = group.angle + i * Math.PI * 2 / ARC_GROUP_SIZE;
+    var ex = clamp(p.x + Math.cos(a) * radius, 16, WORLD_W - 16);
+    var ey = clamp(p.y + Math.sin(a) * radius, 16, WORLD_H - 16);
+    var toP = Math.atan2(player.y - ey, player.x - ex) * 180 / Math.PI;
+    spawnEnemy("arc", ex, ey, toP, { arcGroup: group, arcSlot: i });
+  }
+}
+
 // ---- 生成ディレクター：時間経過で少しずつ激しくなる ----
 var director = { timer: 0.6 };
 function directorUpdate(dt) {
@@ -109,6 +132,17 @@ function directorUpdate(dt) {
   var toPlayer = Math.atan2(player.y - p.y, player.x - p.x) * 180 / Math.PI;
   if (roll < diff.newProb) {
     // 新敵：既存3種が主役のまま時々混ざる。タンクはその中でもまれ。
+    // 新敵3体（ステッパー／ヒーラー／アーク）は、解放時間以降は新敵枠の
+    // 一部（NEW_TRIO_PROB）を分け合う。残りは従来の内訳どおり。
+    if (elapsed >= STEPPER_UNLOCK_TIME && Math.random() < NEW_TRIO_PROB) {
+      var trio = ["stepper"];
+      if (elapsed >= HEALER_UNLOCK_TIME) trio.push("healer");
+      if (elapsed >= ARC_UNLOCK_TIME) trio.push("arc");
+      var tp = trio[Math.floor(Math.random() * trio.length)];
+      if (tp === "arc") spawnArcGroup(p);
+      else spawnEnemy(tp, p.x, p.y, toPlayer + rand(-14, 14));
+      return;
+    }
     var nr = Math.random();
     if (nr < NEW_MIX.tank) spawnEnemy("tank", p.x, p.y, toPlayer + rand(-10, 10));
     else if (nr < NEW_MIX.darter) {
@@ -223,6 +257,7 @@ function resetGame() {
   particles = []; popups = [];
   shards = []; rings = []; sparks = [];
   frostZones = [];
+  healBeams = []; stepperGhosts = [];
   comboCount = 0; comboTimer = 0; comboPop = 0;
   hitStop = 0; gridPulse = 0; flashWhite = 0;
   odGauge = 0; odActive = false; odTimer = 0;
@@ -548,6 +583,20 @@ function update(dt) {
             e.dead = true;
             damagePlayer(CONTACT_DMG);
           }
+          break;
+        }
+      }
+    }
+    // 自機 × アークの電気：個体同士を結ぶ線に触れると-10（このブロック
+    // 自体が無敵時間中は入らないので、被弾後無敵1秒がそのまま効く。
+    // 電気は弾を通し、子機には当たらない＝ここでだけ判定する）
+    if (!damaged) {
+      var links = arcLinks();
+      for (var li = 0; li < links.length; li++) {
+        var la = links[li][0], lb = links[li][1];
+        if (distToSegment(player.x, player.y, la.x, la.y, lb.x, lb.y) < player.r + 3) {
+          damagePlayer(ARC_ELEC_DMG);
+          damaged = true;
           break;
         }
       }
