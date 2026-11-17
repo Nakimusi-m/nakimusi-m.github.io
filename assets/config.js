@@ -9,7 +9,8 @@
      座標系／自機・弾・オーバードライブ基本性能／演出上限／
      入力／ボマー爆発／被弾ダメージ／OD倍率／ダーター／
      ボマー／フロスター凍結／スナイパー／アンプ／攻撃部品／
-     交戦距離／スプリッター分裂／生成ディレクター／難易度／
+     交戦距離／スプリッター分裂／生成ディレクター／ヒーラー／
+     アーク／ステッパー／難易度／
      難易度カーブ／ボス《ペルマフロスト》／子機（ドローン）／
      OD見直し（ブースター連動）／演出（リング・シェイク）
    難易度倍率の適用箇所は game.js の diffSpeed に集約してある。
@@ -56,7 +57,8 @@ var OD_GAIN = {
   square: 4, diamond: 5, hexagon: 12, darter: 5,
   splitter: 8, splitter2: 6, splitter3: 4, splitlet: 3,
   tank: 30, spiral: 12, guardian: 10, bomber: 6,
-  froster: 6, sniper: 7, amp: 8
+  froster: 6, sniper: 7, amp: 8,
+  healer: 10, arc: 6, stepper: 5
 };
 
 // ---- 演出オブジェクトの同時発生上限（軽量化） ----
@@ -144,6 +146,48 @@ var SQUAD_PROB = 0.3;            // 四角が小隊で出る確率
 var DARTER_GROUP = 3;            // ダーターの同時出現数
 var DARTER_FAR_DIST = 280;       // ダーター同士の出現点の最小間隔
 var NEW_MIX = { tank: 0.06, darter: 0.18, splitter: 0.30, spiral: 0.41, guardian: 0.53, bomber: 0.65, froster: 0.76, sniper: 0.88 }; // 新敵枠の内訳（累積）。残りはアンプ。タンクは従来どおりレア、他はほぼ均等
+
+// ---- 新敵3体の出現配分 ----
+// 新敵枠（newProb）のうち、この割合を新敵3体（ステッパー／ヒーラー／
+// アーク）が分け合う。残りは従来の NEW_MIX の内訳どおりに振り分ける
+// ので、既存の敵同士の比率は一切変わらない。3体の解放は経過時間制：
+// ステッパー30秒〜／ヒーラー60秒〜／アーク90秒〜（各セクション参照）。
+var NEW_TRIO_PROB = 0.3;
+
+// ---- ヒーラー（回復する敵）の数値 ----
+// 1秒ごとに周囲の味方へ回復ビームを送る支援型。自機とは距離を保つ。
+var HEALER_UNLOCK_TIME = 60;     // 出現が解放される経過時間（秒。中盤以降）
+var HEALER_RANGE = 280;          // 回復ビームの届く半径
+var HEALER_INTERVAL = 1.0;       // 回復の間隔（秒）。敵定義（enemies.js の healer.fireInterval）と同値に保つ
+var HEALER_FRACTION = 0.2;       // 1回の回復量＝対象の最大HPの20%
+var HEALER_MAX_TARGETS = 5;      // 1回に回復できる味方の最大数（近い順）
+var HEALER_KEEP_MIN = 280;       // 自機と保つ距離の下限（これより近ければ下がる）
+var HEALER_KEEP_MAX = 340;       // 自機と保つ距離の上限（これより遠ければ寄る）
+var HEALER_BEAM_LIFE = 0.35;     // 回復ビームの表示時間（秒）
+
+// ---- アーク（電気を帯びた敵）の数値 ----
+// 3体セットで三角形を作り、回転＋伸縮しながら中心ごと自機へ迫る。
+var ARC_UNLOCK_TIME = 90;        // 出現が解放される経過時間（秒。中盤〜終盤）
+var ARC_GROUP_SIZE = 3;          // 1回の出現で出す個体数
+var ARC_CENTER_SPEED = 75;       // 中心点の移動速度（敵定義 arc.speed と同値。難易度倍率は生成時に diffSpeed で適用）
+var ARC_SOLO_SPEED = 110;        // 1体だけになった時の突撃速度（中心速度に対する比率で適用し、倍率を保つ）
+var ARC_ROT_PERIOD = 2.8;        // 三角形の回転周期（秒／1回転）
+var ARC_PULSE_PERIOD = 3.2;      // 三角形の伸縮周期（秒）
+var ARC_RADIUS_MIN = 55;         // 伸縮：中心から各個体までの距離の下限（一辺およそ95px）
+var ARC_RADIUS_MAX = 95;         // 伸縮：中心から各個体までの距離の上限（一辺およそ165px）
+var ARC_ELEC_DMG = 10;           // 電気に触れた時のダメージ（被弾後無敵1秒は通常どおり適用）
+
+// ---- ステッパー（カクカク移動する敵）の数値 ----
+// 上下左右にだけ、決まった歩幅を素早く進んでは止まる、を繰り返す。
+var STEPPER_UNLOCK_TIME = 30;    // 出現が解放される経過時間（秒。序盤〜中盤）
+var STEPPER_STEP_MIN = 56;       // 歩幅の下限（px。個体ごとにスポーン時決定し固定）
+var STEPPER_STEP_MAX = 84;       // 歩幅の上限（px）
+var STEPPER_MOVE_TIME = 0.12;    // 1回の移動にかかる時間（秒。難易度倍率で短縮される）
+var STEPPER_PAUSE_TIME = 0.45;   // 移動と移動の間の静止時間（秒）
+var STEPPER_SIDE_PROB = 0.3;     // 方向決定で横へずれる確率（残りは自機へ近づく方向）
+var STEPPER_GHOST_LIFE = 0.25;   // 移動時の残像（ゴースト）の表示時間（秒）
+var STEPPER_GHOST_INTERVAL = 0.03; // 残像を残す間隔（秒）
+var STEPPER_GHOST_MAX = 48;      // 残像の同時発生上限（軽めに抑える）
 
 // ---- 難易度（タイトル／リトライ画面で選択。デフォルトはノーマル） ----
 // 効果は「敵の移動速度」と「敵弾の速度」への倍率のみ（ボスの移動・

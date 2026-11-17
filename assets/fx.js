@@ -5,6 +5,18 @@
    上限と大きさの数値は config.js の設定表を参照する。
    ============================================================ */
 
+// ---- 新敵の演出オブジェクト ----
+// ヒーラーの回復ビーム {x1,y1,x2,y2,life,maxLife} と、ステッパーの
+// 移動残像（ゴースト）{x,y,spr,life,maxLife}。どちらも短命で少数なので
+// プール化はせず、寿命で除去するだけに留める（上限は発生側で抑える）。
+var healBeams = [];
+var stepperGhosts = [];
+// ステッパーの残像を1つ残す（上限内でのみ。スプライトは敵のものを共用）
+function spawnStepperGhost(e) {
+  if (stepperGhosts.length >= STEPPER_GHOST_MAX) return;
+  stepperGhosts.push({ x: e.x, y: e.y, spr: e.spr, life: STEPPER_GHOST_LIFE, maxLife: STEPPER_GHOST_LIFE });
+}
+
 // 演出オブジェクトの更新。除去は末尾との入れ替え（swap-remove）で
 // O(1) にし、使い終わったオブジェクトはプールへ戻して再利用する。
 function updateFx(dt) {
@@ -59,6 +71,15 @@ function updateFx(dt) {
     t.y -= 34 * dt; t.life -= dt;
     if (t.pop > 0) t.pop = Math.max(0, t.pop - dt / 0.22);
     if (t.life <= 0) popups.splice(i, 1);
+  }
+  // ヒーラーの回復ビームとステッパーの残像の寿命
+  for (i = healBeams.length - 1; i >= 0; i--) {
+    healBeams[i].life -= dt;
+    if (healBeams[i].life <= 0) healBeams.splice(i, 1);
+  }
+  for (i = stepperGhosts.length - 1; i >= 0; i--) {
+    stepperGhosts[i].life -= dt;
+    if (stepperGhosts[i].life <= 0) stepperGhosts.splice(i, 1);
   }
   // コンボの残り時間・ポップ、グリッド脈動、マズルの減衰
   if (state === "playing") {

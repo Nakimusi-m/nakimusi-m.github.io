@@ -112,6 +112,25 @@ var ENEMY_TYPES = {
     icon: '<circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/>',
     movement: "drift", attack: "pulse", speed: [70, 88], rotMode: "spin",
     fireInterval: [2.8, 2.8] // パルスの間隔（AMP_PULSE_INTERVAL と同値）
+  },
+  healer: { // ヒーラー：白緑の丸に十字。距離を保ちながら、1秒ごとに近くの味方を回復する支援型
+    shape: "healer", color: "#6dffb8", r: 16, hp: 2.5, score: 350,
+    name: "ヒーラー", desc: "自機と距離を保ち、1秒ごとに周囲280pxで最も近い味方を最大5体、最大HPの20%回復する",
+    icon: '<circle cx="0" cy="0" r="11" fill="none" stroke="#6dffb8" stroke-width="3"/><path d="M0 -6.5 V6.5 M-6.5 0 H6.5" fill="none" stroke="#6dffb8" stroke-width="3.4"/>',
+    movement: "healerKeep", attack: "heal", speed: [60, 60], rotMode: "none",
+    fireInterval: [1.0, 1.0] // 回復の間隔（HEALER_INTERVAL と同値）
+  },
+  arc: { // アーク：白黄色の小さなオーブ。3体セットで三角形を作り、回転＋伸縮しながら電気を張って迫る
+    shape: "orb", color: "#ffe66d", r: 11, hp: 1, score: 150,
+    name: "アーク", desc: "3体セットで出現。回転＋伸縮する三角形の電気に触れると-10。2体で直線の電気、1体になると電気が消えて突撃する",
+    icon: '<circle cx="0" cy="0" r="8" fill="none" stroke="#ffe66d" stroke-width="3"/><circle cx="0" cy="0" r="2.6" fill="#ffe66d"/>',
+    movement: "arcOrbit", attack: "none", speed: [75, 75], rotMode: "none" // 中心の移動速度（ARC_CENTER_SPEED と同値）
+  },
+  stepper: { // ステッパー：バイオレットの十字。上下左右にだけ決まった歩幅でカクカク進む
+    shape: "cross", color: "#a06bff", r: 13, hp: 0.75, score: 150,
+    name: "ステッパー", desc: "上下左右にだけ、個体ごとの歩幅（56〜84px）を素早く進んでは止まる。射撃なし",
+    icon: '<path d="M-4 -12 H4 V-4 H12 V4 H4 V12 H-4 V4 H-12 V-4 H-4 Z" fill="none" stroke="#a06bff" stroke-width="2.6"/>',
+    movement: "step", attack: "none", speed: [0, 0], rotMode: "none" // 移動は歩幅と時間で決まる（step部品側で計算）
   }
 };
 
@@ -121,7 +140,7 @@ var ENEMY_TYPES = {
    スコアは hp / score から換算するので、図鑑だけが古い数値に
    なることはない。ボスは config.js の BOSS_* から組み立てる。
    ============================================================ */
-var ENEMY_ZUKAN_ORDER = ["square", "diamond", "hexagon", "darter", "splitter", "splitter2", "splitter3", "splitlet", "tank", "spiral", "guardian", "bomber", "froster", "sniper", "amp"];
+var ENEMY_ZUKAN_ORDER = ["square", "diamond", "hexagon", "darter", "splitter", "tank", "spiral", "guardian", "bomber", "froster", "sniper", "amp", "healer", "arc", "stepper"];
 function zukanFmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 function zukanMulText(v) { return v === Math.floor(v) ? v.toFixed(1) : String(v); }
 function zukanFigureHtml(icon, name, stat, desc) {
@@ -130,12 +149,34 @@ function zukanFigureHtml(icon, name, stat, desc) {
     '<span class="lg-stat">' + stat + '</span>' +
     '<span class="lg-desc">' + desc + '</span></figcaption></figure>';
 }
+// スプリッター系統は図鑑では1項目にまとめる：系統全体（親1→子2→孫4→
+// ひ孫8）を全て倒し切った場合の合計（発数・スコア）と、世代ごとの
+// 内訳を、敵定義の nextType チェーンと hp / score から組み立てる。
+function zukanSplitterHtml() {
+  var t = ENEMY_TYPES.splitter;
+  var counts = 1, totHits = 0, totScore = 0, parts = [], gens = 0;
+  var cur = "splitter";
+  while (cur) {
+    var ct = ENEMY_TYPES[cur];
+    var hits = Math.round(ct.hp / BULLET_DAMAGE);
+    totHits += hits * counts;
+    totScore += ct.score * counts;
+    parts.push(hits + "発・" + ct.score + "点" + (counts > 1 ? "×" + counts : ""));
+    gens++;
+    counts *= 2;
+    cur = ct.nextType || null;
+  }
+  var desc = "倒すと2体に分裂（全" + gens + "世代）。内訳：" + parts.join(" → ");
+  return zukanFigureHtml(t.icon, t.name, "合計" + totHits + "発 ・ " + zukanFmtNum(totScore) + "点", desc);
+}
 function buildEnemyLegend() {
   var host = document.getElementById("enemy-legend");
   if (!host) return;
   var html = "";
   for (var i = 0; i < ENEMY_ZUKAN_ORDER.length; i++) {
-    var t = ENEMY_TYPES[ENEMY_ZUKAN_ORDER[i]];
+    var key = ENEMY_ZUKAN_ORDER[i];
+    if (key === "splitter") { html += zukanSplitterHtml(); continue; } // 系統は1項目に統合
+    var t = ENEMY_TYPES[key];
     var hits = Math.round(t.hp / BULLET_DAMAGE); // 通常弾1発＝BULLET_DAMAGE ダメージ換算
     html += zukanFigureHtml(t.icon, t.name, hits + "発 ・ " + t.score + "点", t.desc);
   }
