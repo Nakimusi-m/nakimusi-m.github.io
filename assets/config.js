@@ -141,8 +141,8 @@ var NEW_MIX = { tank: 0.06, darter: 0.18, splitter: 0.30, spiral: 0.41, guardian
 // 砲塔弾・バースト・回転弾幕・氷結弾の飛翔速度にも同じ倍率が掛かる）。
 // 出現間隔・HP・ダメージ量・自機性能・スコア計算は難易度で変えない。
 var DIFFICULTY_DEFS = [
-  { id: "veryeasy", label: "ベリーイージー", mul: 0.6 }, // 速度40%低下
-  { id: "easy", label: "イージー", mul: 0.8 },           // 速度20%低下
+  { id: "veryeasy", label: "ベリーイージー", mul: 0.8 }, // 速度20%低下（減少量を半減：従来40%→20%）
+  { id: "easy", label: "イージー", mul: 0.9 },           // 速度10%低下（減少量を半減：従来20%→10%）
   { id: "normal", label: "ノーマル", mul: 1.0 }          // 現状どおり
 ];
 
@@ -218,13 +218,14 @@ var BOSS_FINISH_FX_TIME = 0.8;   // 処刑完了時、大爆発の前に残骸�
 var DRONE_HP = { attacker: 6, guard: 9, booster: 6, sniper: 6 }; // 役割ごとのHP（敵弾1発＝ダメージ1。ガードは3倍、他は従来の2倍）
 var DRONE_REVIVE_TIME = 30;       // 機能停止から復帰までの時間（秒）
 var DRONE_R = 10;                 // 子機の当たり判定半径
-// 追従（全子機共通）：所定の配置位置へ最高速度つきで移動する。
-// 最高速度はガード従来の追従速度（283）より少し速く、ただし自機の
-// 通常移動速度（308）よりは少し遅い値にし、自機が速く動き続けると
-// 子機が少し遅れて追いつく性格を残す。配置位置に近づくと距離に
+// 追従：所定の配置位置へ最高速度つきで移動する。最高速度は役割ごとに
+// 差を持たせる（アタッカーが一番速く、ガードが一番遅い）。
+// アタッカー320は自機の通常移動速度（308）を少しだけ上回るが、
+// 近距離型として意図した値。ガード280は従来値283とほぼ同じで、
+// 「少し遅れてついてくる」性格を残す。配置位置に近づくと距離に
 // 比例して減速して滑らかに収まる。大きく引き離された時だけ上限を
-// 上げて強めに寄せる（破綻防止）。
-var DRONE_FOLLOW_SPEED = 300;        // 追従の最高速度（全役割共通）
+// 上げて強めに寄せる（破綻防止、全役割共通）。
+var DRONE_FOLLOW_SPEEDS = { attacker: 320, booster: 300, sniper: 290, guard: 280 }; // 役割ごとの追従の最高速度
 var DRONE_FOLLOW_ARRIVE_R = 80;      // この距離以内では距離に比例して減速する
 var DRONE_FOLLOW_CATCHUP_DIST = 420; // この距離を超えたら強めに寄せる
 var DRONE_FOLLOW_CATCHUP_SPEED = 640; // 引き離された時の追従の最高速度
@@ -242,13 +243,13 @@ var DRONE_PELLET_DMG = 0.125;     // 粒1発のダメージ（従来0.25の半�
 // ガード（青い小盾／ガーディアンがドロップ）
 var DRONE_GUARD_MAX = 2;
 var DRONE_GUARD_DIST = 40;        // 斜め後方の配置距離（アタッカーより内側）
-var DRONE_GUARD_SHIELD_R = 132;   // シールドの半径（従来の+20%）
+var DRONE_GUARD_SHIELD_R = 106;   // シールドの半径（132から20%減）
 var DRONE_GUARD_CUT = 0.3;        // 圏内のガード1機につきダメージ30%カット
 // シールドHP制：シールド自体に体力があり、敵弾1発で1減る（ボス弾も同じ）。
 // 0になると割れて、DRONE_GUARD_SHIELD_REGEN 秒後に全回復で自動再展開する。
 // ダメージ軽減が効くのはシールド展開中だけ。接触ダメージでは減らない。
-var DRONE_GUARD_SHIELD_HP = 10;   // シールドの体力（敵弾10発で割れる）
-var DRONE_GUARD_SHIELD_REGEN = 6; // 割れてから再展開までの時間（秒）
+var DRONE_GUARD_SHIELD_HP = 20;   // シールドの体力（敵弾20発で割れる。従来10の2倍）
+var DRONE_GUARD_SHIELD_REGEN = 18; // 割れてから再展開までの時間（秒。従来6の3倍）
 // ブースター（金の小リング／アンプがドロップ）
 var DRONE_BOOSTER_MAX = 3;
 var DRONE_BOOSTER_GAP = 30;       // 尾の間隔（px）。自機の向きの後ろ側に一列に連なる
