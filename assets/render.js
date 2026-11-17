@@ -76,13 +76,27 @@ function draw() {
   for (var gy = gy0; gy <= gy1; gy += 60) { ctx.moveTo(Math.max(0, camX - VIEW_W / 2), gy); ctx.lineTo(Math.min(WORLD_W, camX + VIEW_W / 2), gy); }
   ctx.stroke();
 
-  // 星（ワールド全体に散布。画面外は粗く間引く）
+  // パララックス遠層グリッド：カメラの動きに少し遅れて流れる大きな格子で
+  // 奥行きを出す（本グリッドより大きく・薄く、雰囲気は変えない）
+  var pgOffX = camX * 0.15, pgOffY = camY * 0.15;
+  var pgx0 = Math.floor((camX - VIEW_W / 2 - pgOffX) / 120) * 120 + pgOffX;
+  var pgy0 = Math.floor((camY - VIEW_H / 2 - pgOffY) / 120) * 120 + pgOffY;
+  ctx.strokeStyle = "rgba(34, 230, 255, 0.045)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var pgx = pgx0; pgx <= camX + VIEW_W / 2 + 4; pgx += 120) { ctx.moveTo(pgx, camY - VIEW_H / 2); ctx.lineTo(pgx, camY + VIEW_H / 2); }
+  for (var pgy = pgy0; pgy <= camY + VIEW_H / 2 + 4; pgy += 120) { ctx.moveTo(camX - VIEW_W / 2, pgy); ctx.lineTo(camX + VIEW_W / 2, pgy); }
+  ctx.stroke();
+
+  // 星（2層パララックス：遠層はカメラの55%、近層は85%で流れ、奥行きが出る）
   ctx.fillStyle = "rgba(160, 220, 255, 0.75)";
   for (var i = 0; i < stars.length; i++) {
     var s = stars[i];
-    if (Math.abs(s.x - camX) > VIEW_W / 2 + 6 || Math.abs(s.y - camY) > VIEW_H / 2 + 6) continue;
-    ctx.globalAlpha = 0.25 + s.s * 0.3;
-    ctx.fillRect(s.x, s.y, s.s, s.s * 2.2);
+    var spar = s.par != null ? s.par : 1;
+    var sex = s.x + camX * (1 - spar), sey = s.y + camY * (1 - spar);
+    if (Math.abs(sex - camX) > VIEW_W / 2 + 6 || Math.abs(sey - camY) > VIEW_H / 2 + 6) continue;
+    ctx.globalAlpha = (0.25 + s.s * 0.3) * (spar < 0.7 ? 0.55 : 1);
+    ctx.fillRect(sex, sey, s.s, s.s * 2.2);
   }
   ctx.globalAlpha = 1;
 
@@ -145,6 +159,21 @@ function draw() {
 
   // ドロップカプセル
   drawCapsules();
+
+  // カプセル取得の光の筋：取得位置から自機へ吸い込まれる線と光点
+  for (i = 0; i < pickupStreaks.length; i++) {
+    var ps = pickupStreaks[i];
+    var pk2 = 1 - Math.max(ps.life, 0) / ps.maxLife; // 0→1で自機へ寄る
+    var pmx = ps.x1 + (player.x - ps.x1) * pk2, pmy = ps.y1 + (player.y - ps.y1) * pk2;
+    ctx.save();
+    ctx.globalAlpha = (1 - pk2) * 0.85;
+    ctx.strokeStyle = ps.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(ps.x1, ps.y1); ctx.lineTo(player.x, player.y); ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath(); ctx.arc(pmx, pmy, 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
 
   // ボス本体と砲塔
   if (boss) drawBoss();
@@ -254,8 +283,8 @@ function draw() {
   // 子機（シールド→本体の順）
   drawDrones();
 
-  // 自機
-  if (state !== "over") drawPlayer();
+  // 自機（ゲームオーバー確定後とスローモーション中は砕けて消えている）
+  if (state !== "over" && state !== "dying") drawPlayer();
 
   // パーティクル（光の粉）
   for (i = 0; i < particles.length; i++) {
@@ -326,6 +355,54 @@ function draw() {
     ctx.globalAlpha = Math.min(flashWhite, 1) * 0.85;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.restore();
+  }
+
+  // 被弾方向の弧：当たった方向の画面端に赤い弧を短時間出す（自機は常に中央）
+  if (damageDirT > 0 && (state === "playing" || state === "dying")) {
+    var dda = Math.max(damageDirT, 0) / DMG_ARC_TIME;
+    var dcx = VIEW_W / 2 + Math.cos(damageDirAngle) * (VIEW_W * 0.36);
+    var dcy = VIEW_H / 2 + Math.sin(damageDirAngle) * (VIEW_H * 0.36);
+    ctx.save();
+    ctx.translate(dcx, dcy);
+    ctx.rotate(damageDirAngle);
+    ctx.globalAlpha = dda * 0.85;
+    ctx.strokeStyle = "#ff4040";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.shadowColor = "#ff4040";
+    ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(0, 0, 30, -0.7, 0.7); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ゲーム中のベスト更新バナー：一度だけ中央上部に出す
+  if (recordBannerT > 0 && state === "playing") {
+    var rba = Math.min(recordBannerT / 0.35, 1) * Math.min((RECORD_BANNER_TIME - recordBannerT) / 0.2 + 0.2, 1);
+    ctx.save();
+    ctx.globalAlpha = clamp(rba, 0, 1);
+    ctx.textAlign = "center";
+    ctx.font = "900 30px Orbitron, monospace";
+    ctx.fillStyle = "#ffc233";
+    ctx.shadowColor = "#ffc233";
+    ctx.shadowBlur = 16;
+    ctx.fillText("NEW RECORD", VIEW_W / 2, 74);
+    ctx.restore();
+  }
+
+  // スタートのカウントイン：READY（前半）→ GO（後半）、合計1秒以内
+  if (introT > 0 && state === "playing") {
+    var introElapsed = INTRO_TIME - introT;
+    var isReady = introElapsed < INTRO_READY_TIME;
+    var segT = isReady ? introElapsed / INTRO_READY_TIME : (introElapsed - INTRO_READY_TIME) / (INTRO_TIME - INTRO_READY_TIME);
+    ctx.save();
+    ctx.globalAlpha = segT < 0.7 ? 1 : 1 - (segT - 0.7) / 0.3;
+    ctx.textAlign = "center";
+    ctx.font = "900 " + Math.round(38 + segT * 6) + "px Orbitron, monospace";
+    ctx.fillStyle = isReady ? "#22e6ff" : "#3dff7a";
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 16;
+    ctx.fillText(isReady ? "READY" : "GO", VIEW_W / 2, VIEW_H / 2 - 40);
     ctx.restore();
   }
 
@@ -678,12 +755,19 @@ function drawDrones() {
   for (i = 0; i < drones.length; i++) {
     d = drones[i];
     if (d.role !== "guard" || d.down || d.shieldDown) continue; // 割れている間は泡なし
+    // 再展開直後は泡が小さく膨らんで戻る（shieldPopT の間だけ半径を補間）
+    var shieldR = DRONE_GUARD_SHIELD_R;
+    if (d.shieldPopT > 0) {
+      var popK = 1 - d.shieldPopT / SHIELD_POP_TIME; // 0→1
+      var popEase = 1 - (1 - popK) * (1 - popK);
+      shieldR = DRONE_GUARD_SHIELD_R * (0.5 + 0.5 * popEase);
+    }
     ctx.save();
     ctx.fillStyle = "rgba(45, 123, 255, 0.05)";
-    ctx.beginPath(); ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(d.x, d.y, shieldR, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = "rgba(140, 190, 255, " + (d.shieldFlash > 0 ? 0.75 : 0.26) + ")";
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(d.x, d.y, shieldR, 0, Math.PI * 2); ctx.stroke();
     // シールド残量ゲージ：縁に沿って、残っている割合だけ明るい円弧を引く
     var sfrac = Math.max(d.shieldHp, 0) / DRONE_GUARD_SHIELD_HP;
     if (sfrac > 0) {
@@ -691,7 +775,7 @@ function drawDrones() {
       ctx.lineWidth = 3;
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.arc(d.x, d.y, DRONE_GUARD_SHIELD_R, -Math.PI / 2, -Math.PI / 2 + sfrac * Math.PI * 2);
+      ctx.arc(d.x, d.y, shieldR, -Math.PI / 2, -Math.PI / 2 + sfrac * Math.PI * 2);
       ctx.stroke();
     }
     ctx.restore();
@@ -704,6 +788,16 @@ function drawDrones() {
     ctx.lineWidth = 1.4;
     ctx.beginPath(); ctx.arc(d.x, d.y, 14.5, 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
+    // 組み上がり演出：出現直後の約0.3秒、役割色の輪が広がって収束する
+    if (d.spawnFxT > 0) {
+      var sfk = 1 - d.spawnFxT / DRONE_SPAWN_FX_TIME; // 0→1
+      ctx.save();
+      ctx.globalAlpha = (1 - sfk) * 0.9;
+      ctx.strokeStyle = DRONE_ROLES[d.role].color;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(d.x, d.y, 6 + sfk * 26, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
     var col = d.down ? "#8a97a8" : DRONE_ROLES[d.role].color;
     ctx.save();
     ctx.translate(d.x, d.y);

@@ -45,9 +45,9 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #stage.lowhp::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
   box-shadow: inset 0 0 60px rgba(255, 40, 40, 0.45);
-  animation: lowhpPulse 0.9s ease-in-out infinite;
+  animation: lowhpPulse 1.9s ease-in-out infinite;
 }
-@keyframes lowhpPulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 0.85; } }
+@keyframes lowhpPulse { 0%, 100% { opacity: 0.18; } 50% { opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) {
   #stage.lowhp::before { animation: none; opacity: 0.5; }
 }
