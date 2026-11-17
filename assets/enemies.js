@@ -91,7 +91,7 @@ var ENEMY_TYPES = {
   },
   bomber: { // ボマー：丸。近づくと点滅して自爆し、周囲を巻き込む（耐久は2倍の2／移動速度は20%上げた）
     shape: "circle", color: "#ff2a2a", r: 15, hp: 2, score: 200,
-    name: "ボマー", desc: "近づくと点滅して自爆（爆発半径130）",
+    name: "ボマー", desc: "近づくと点滅と加速するビープ音で予告して自爆（爆発半径130）",
     icon: '<circle cx="0" cy="0" r="12" fill="none" stroke="#ff2a2a" stroke-width="3"/><circle cx="0" cy="0" r="4" fill="#ff2a2a"/>',
     movement: "bomberChase", attack: "none", speed: [110, 142], rotMode: "none"
   },

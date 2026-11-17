@@ -41,19 +41,24 @@ function activeBoosterCount() {
   for (var i = 0; i < drones.length; i++) if (drones[i].role === "booster" && !drones[i].down) n++;
   return n;
 }
-function addDrone(role) {
+function addDrone(role, atX, atY) {
   var idx = droneCount(role);
+  var sx = atX != null ? atX : player.x, sy = atY != null ? atY : player.y;
   drones.push({
-    role: role, x: player.x, y: player.y,
+    role: role, x: sx, y: sy,
     hp: DRONE_HP[role], maxHp: DRONE_HP[role], down: false, reviveT: 0,
     fireTimer: 0.25 + idx * 0.13, // 複数機は発射タイミングをずらす
     aim: player.angle,
+    spawnFxT: DRONE_SPAWN_FX_TIME, // 組み上がり演出（機能は即時有効、見た目だけ）
     // ガードのシールドHP制（他役割では未使用）：満タンで展開し、
     // 0になると割れて shieldRegenT 秒後に全回復で自動再展開する
-    shieldHp: DRONE_GUARD_SHIELD_HP, shieldDown: false, shieldRegenT: 0, shieldFlash: 0,
+    shieldHp: DRONE_GUARD_SHIELD_HP, shieldDown: false, shieldRegenT: 0, shieldFlash: 0, shieldPopT: 0,
     // スナイパーの照準ステート（他役割では未使用）：照準中は目標を保持する
     snipeState: null, snipeTarget: null, snipeTimer: 0
   });
+  // 出現演出：その場でリングが展開し、光の粒子とともに組み上がる
+  spawnRing(sx, sy, DRONE_ROLES[role].color, 1);
+  burst(sx, sy, DRONE_ROLES[role].color, 10);
 }
 // 点(x, y)を覆っている、シールド展開中のガードの数（ダメージカットの計算用）。
 // シールドが割れている間は軽減も切れるので数に入れない。
@@ -79,8 +84,12 @@ function hitGuardShield(d) {
     d.shieldHp = 0;
     d.shieldDown = true;
     d.shieldRegenT = DRONE_GUARD_SHIELD_REGEN;
+    // 割れる時は青い破片を強めに飛ばす（粒子・火花・二重の輪）
     burst(d.x, d.y, "#9fd0ff", 16);
+    burst(d.x, d.y, "#2d7bff", 10);
+    spawnSparks(d.x, d.y, "#9fd0ff", 9);
     spawnRing(d.x, d.y, "#9fd0ff", 2);
+    spawnRing(d.x, d.y, "#2d7bff", 1);
     sfxShieldBreak();
   }
 }
@@ -163,19 +172,29 @@ function updateDrones(dt) {
   for (var i = 0; i < drones.length; i++) {
     var d = drones[i];
     var idx = roleIdx[d.role]++;
+    if (d.spawnFxT > 0) d.spawnFxT -= dt;
     // 機能停止中は復帰タイマーを進める（追従だけは続ける）
     if (d.down) {
       d.reviveT -= dt;
-      if (d.reviveT <= 0) { d.down = false; d.hp = d.maxHp; burst(d.x, d.y, DRONE_ROLES[d.role].color, 6); }
+      if (d.reviveT <= 0) {
+        d.down = false; d.hp = d.maxHp;
+        // 復帰演出：シアンのリング＋上昇する粒子＋修理完了の柔らかい音
+        burst(d.x, d.y, DRONE_ROLES[d.role].color, 6);
+        spawnRing(d.x, d.y, "#22e6ff", 1);
+        burstRising(d.x, d.y, "#22e6ff", 8);
+        sfxDroneRevive();
+      }
     }
     // ---- ガードのシールド：割れている間は再展開タイマーを進める ----
     if (d.role === "guard") {
       if (d.shieldFlash > 0) d.shieldFlash -= dt;
+      if (d.shieldPopT > 0) d.shieldPopT -= dt;
       if (d.shieldDown) {
         d.shieldRegenT -= dt;
         if (d.shieldRegenT <= 0) {
           d.shieldDown = false;
           d.shieldHp = DRONE_GUARD_SHIELD_HP; // 全回復で自動再展開
+          d.shieldPopT = SHIELD_POP_TIME; // 泡が膨らんで戻る動き（render.js）
           spawnRing(d.x, d.y, "#9fd0ff", 1);
           sfxShieldRestore();
         }
@@ -305,6 +324,11 @@ function updateDroneSniper(d, dt) {
 // ---- ドロップカプセル ----
 function spawnCapsule(x, y, role) {
   capsules.push({ x: x, y: y, role: role, life: CAPSULE_LIFE, phase: rand(0, Math.PI * 2) });
+  // 出現演出：小さな閃光とリングの波紋＋短い電子音（上限内）
+  burst(x, y, "#ffffff", 6);
+  burst(x, y, DRONE_ROLES[role] ? DRONE_ROLES[role].color : "#e8ecf2", 6);
+  spawnRing(x, y, DRONE_ROLES[role] ? DRONE_ROLES[role].color : "#e8ecf2", 1);
+  sfxCapsuleSpawn();
 }
 function updateCapsules(dt) {
   for (var i = capsules.length - 1; i >= 0; i--) {
@@ -335,8 +359,11 @@ function pickupCapsule(c) {
   var role = c.role;
   if (role === "random") role = DRONE_ROLE_ORDER[Math.floor(Math.random() * DRONE_ROLE_ORDER.length)];
   var text = null, color = DRONE_ROLES[role].color;
+  // 取得演出：取得位置から自機へ光の筋が吸い込まれる（render.js が自機へ追従描画）
+  if (pickupStreaks.length < 8) pickupStreaks.push({ x1: c.x, y1: c.y, life: 0.28, maxLife: 0.28, color: color });
+  burst(c.x, c.y, color, 5);
   if (droneCount(role) < DRONE_ROLES[role].max) {
-    addDrone(role);
+    addDrone(role, c.x, c.y); // 新しい子機は取得位置で組み上がる
     text = DRONE_ROLES[role].name + " +1";
   } else {
     var repair = null, i, d;
@@ -367,7 +394,7 @@ function pickupCapsule(c) {
   }
   if (popups.length >= MAX_POPUPS) popups.shift();
   popups.push({ x: player.x, y: player.y - 26, text: text, life: 0.9, maxLife: 0.9, pop: 1, big: true, color: color });
-  sfxPickup();
+  sfxPickupRole(role); // 取得音は役割ごとに音程を変える
   updateHud();
 }
 // ボス撃破報酬の子機+1：まだ持っていない役割を優先し、
@@ -394,7 +421,7 @@ function grantBossDroneReward() {
   addDrone(role);
   if (popups.length >= MAX_POPUPS) popups.shift();
   popups.push({ x: player.x, y: player.y - 40, text: DRONE_ROLES[role].name + " +1", life: 1.1, maxLife: 1.1, pop: 1, big: true, color: DRONE_ROLES[role].color });
-  sfxPickup();
+  sfxPickupRole(role);
 }
 
 

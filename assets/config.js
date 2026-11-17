@@ -379,6 +379,23 @@ var OD_TIME_PER_BOOSTER = 0.8;
 var OD_FIRE_MUL_BASE = 0.9;       // ブースター0機：連射間隔×0.9（現行×0.8の半分の上昇）
 var OD_MOVE_MUL_BASE = 1.125;     // ブースター0機：移動+12.5%（現行+25%の半分）
 
+// ---- 演出強化パッケージ（見た目・音のみ。ゲーム数値は変えない） ----
+var INTRO_TIME = 0.95;           // スタート時の READY→GO カウントイン（秒）
+var INTRO_READY_TIME = 0.55;     // うち READY 表示の長さ（残りは GO）
+var DYING_TIME = 0.8;            // ゲームオーバー時のスローモーション（秒）
+var DYING_SCALE = 0.25;          // スローモーション中の時間倍率
+var OVER_COUNT_TIME = 0.9;       // ゲームオーバー後のスコア・カウントアップ（秒）
+var BIG_KILL_TYPES = { tank: 1, deadeye: 1, aegis: 1, cyclone: 1 }; // 大型撃破（ヒットストップ対象）
+var BIG_KILL_HITSTOP = 0.045;    // 大型撃破のヒットストップ（秒）
+var DMG_ARC_TIME = 0.55;         // 被弾方向の赤い弧の表示時間（秒）
+var LOW_HP_THRESHOLD = 30;       // 低HPビネットが出るHP
+var ARC_CRACKLE_RANGE = 350;     // アークの電気音が聞こえる距離
+var ARC_CRACKLE_INTERVAL = [0.16, 0.3]; // 電気音の間引き間隔（ランダム範囲）
+var DRONE_SPAWN_FX_TIME = 0.3;   // 新しい子機の組み上がり演出（秒）
+var SHIELD_POP_TIME = 0.35;      // ガードのシールド再展開の膨らみ（秒）
+var ENGINE_PARTICLE_RATE = 55;   // エンジン粒子の発生レート（個/秒・移動中のみ）
+var RECORD_BANNER_TIME = 1.8;    // ゲーム中の NEW RECORD 表示（秒）
+
 // ---- 演出の数値（衝撃波リング・シェイク） ----
 var RING_BASE_SPEED = 2600, RING_SPEED_PER_TIER = 800;  // 耐久1で2600、耐久3で3400
 var RING_BASE_WIDTH = 25, RING_WIDTH_PER_TIER = 10;     // 耐久1で太さ25、耐久3で35
