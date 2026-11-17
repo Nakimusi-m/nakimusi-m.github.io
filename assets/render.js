@@ -296,24 +296,25 @@ function draw() {
     ctx.restore();
   }
 
-  // コンボ表示（画面固定）：伸びるほど色が熱くなり、出た瞬間は弾む。
-  // スコア倍率は付けず、表示と効果音の音程だけが変わる。
+  // コンボ表示（画面固定・左上に小さく半透明）：伸びるほど色が熱く
+  // なり、出た瞬間は弾む。スコア倍率は付けず、表示と効果音の音程
+  // だけが変わる。左上のHUD群の下に寄せて、視界の邪魔をしない。
   if (comboCount >= 2 && comboTimer > 0 && (state === "playing" || state === "paused")) {
-    var calpha = comboTimer < 0.4 ? comboTimer / 0.4 : 1;
-    var csize = 24 + comboPop * 13;
+    var calpha = (comboTimer < 0.4 ? comboTimer / 0.4 : 1) * 0.8;
+    var csize = 16 + comboPop * 8;
     ctx.save();
     ctx.globalAlpha = calpha;
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.font = "900 " + Math.round(csize) + "px Orbitron, monospace";
     ctx.fillStyle = comboCount >= 10 ? "#ff2d78" : (comboCount >= 5 ? "#ffc233" : "#22e6ff");
     ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = 12;
-    ctx.fillText(comboCount + " COMBO", VIEW_W / 2, 108);
+    ctx.shadowBlur = 8;
+    ctx.fillText(comboCount + " COMBO", 10, 132);
     ctx.shadowBlur = 0;
     // 残り時間バー
-    var bw = 110 * (comboTimer / COMBO_WINDOW);
+    var bw = 76 * (comboTimer / COMBO_WINDOW);
     ctx.globalAlpha = calpha * 0.8;
-    ctx.fillRect(VIEW_W / 2 - 55, 118, bw, 3);
+    ctx.fillRect(10, 140, bw, 2.5);
     ctx.restore();
   }
 
@@ -325,15 +326,17 @@ function draw() {
   }
 }
 
-// ミニマップ：ワールド全体と自機・敵・カメラ範囲の位置関係
+// ミニマップ：ワールド全体と自機・敵・カメラ範囲の位置関係。
+// 右上の設定ボタンの下に、小さく・半透明で置く。
 function drawMinimap() {
-  var mw = 128, mh = 72;
-  var mx = VIEW_W - mw - 12, my = 74;
+  var mw = 100, mh = 56;
+  var mx = VIEW_W - mw - 10, my = 46;
   var sx = mw / WORLD_W, sy = mh / WORLD_H;
   ctx.save();
-  ctx.fillStyle = "rgba(4, 10, 24, 0.58)";
+  ctx.globalAlpha = 0.72;
+  ctx.fillStyle = "rgba(4, 10, 24, 0.5)";
   ctx.fillRect(mx, my, mw, mh);
-  ctx.strokeStyle = "rgba(34, 230, 255, 0.4)";
+  ctx.strokeStyle = "rgba(34, 230, 255, 0.35)";
   ctx.lineWidth = 1;
   ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
   // カメラ範囲

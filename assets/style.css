@@ -52,46 +52,46 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   #stage.lowhp::before { animation: none; opacity: 0.5; }
 }
 
-/* ---------- HUD ---------- */
+/* ---------- HUD（ゲーム中：隅に小さく・半透明に寄せる） ---------- */
 #hud {
   position: absolute; top: 0; left: 0; right: 0;
-  padding: calc(8px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) 0 calc(12px + env(safe-area-inset-left));
+  padding: calc(5px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left));
   pointer-events: none;
 }
 #hud .row {
-  display: flex; align-items: flex-start; gap: 10px;
+  display: flex; align-items: flex-start; gap: 8px;
 }
-.hud-block { line-height: 1.1; }
+/* 左上の情報群はひと回り小さく、約70%の不透明度でゲームの邪魔をしない */
+.hud-block { line-height: 1.1; opacity: 0.72; }
 .hud-label {
-  font-family: Orbitron, monospace; font-size: 9px; letter-spacing: 0.22em;
+  font-family: Orbitron, monospace; font-size: 8px; letter-spacing: 0.2em;
   color: var(--text-dim);
 }
 .hud-value {
-  font-family: Orbitron, monospace; font-weight: 700; font-size: 21px;
-  color: var(--text); text-shadow: 0 0 10px rgba(34, 230, 255, 0.55);
+  font-family: Orbitron, monospace; font-weight: 700; font-size: 15px;
+  color: var(--text); text-shadow: 0 0 8px rgba(34, 230, 255, 0.45);
   font-variant-numeric: tabular-nums;
 }
-#hud-best .hud-value { font-size: 14px; color: var(--text-dim); text-shadow: none; padding-top: 4px; }
+#hud-best .hud-value { font-size: 11px; color: var(--text-dim); text-shadow: none; padding-top: 3px; }
 #hud-time { margin-left: auto; text-align: right; }
-#hud-time .hud-value { font-size: 14px; padding-top: 4px; }
-/* ボタンだけはタイトル等のオーバーレイより前面に出す（HUD本体は背面のまま） */
+#hud-time .hud-value { font-size: 11px; padding-top: 3px; }
+/* 右上は小さな設定ボタン（歯車）1つだけ。ボタンだけは前面に出す */
 .hud-btns { display: flex; gap: 6px; pointer-events: auto; position: relative; z-index: 20; }
 .icon-btn {
-  width: 40px; height: 40px; min-height: 40px; padding: 0;
+  width: 30px; height: 30px; min-height: 30px; padding: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(8, 16, 36, 0.6); color: var(--cyan);
-  border: 1px solid rgba(34, 230, 255, 0.35); border-radius: 4px;
-  cursor: pointer;
+  background: rgba(8, 16, 36, 0.5); color: var(--cyan);
+  border: 1px solid rgba(34, 230, 255, 0.3); border-radius: 4px;
+  cursor: pointer; opacity: 0.85;
 }
-.icon-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .icon-btn:active { background: rgba(34, 230, 255, 0.18); }
 
-/* HP＋OVERDRIVE 統合バー：1つのフレームの中に
-   上段＝HP（太）、下段＝オーバードライブ（細い金のライン）を収め、
-   ラベルも1行に集約して HUD をすっきり見せる */
+/* HP＋OVERDRIVE 統合バー（小型・半透明版） */
 #core-wrap {
-  margin-top: 8px; width: min(340px, 38vw);
-  padding: 7px 10px 8px;
+  margin-top: 5px; width: min(232px, 30vw);
+  padding: 4px 7px 5px;
+  opacity: 0.72;
   background: linear-gradient(115deg, rgba(10, 22, 46, 0.88), rgba(5, 9, 22, 0.66));
   border: 1px solid rgba(34, 230, 255, 0.38);
   border-left: 3px solid var(--cyan);
@@ -101,26 +101,25 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 #core-head {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-  font-family: Orbitron, monospace; font-size: 9px; letter-spacing: 0.2em; color: var(--text-dim);
+  font-family: Orbitron, monospace; font-size: 8px; letter-spacing: 0.18em; color: var(--text-dim);
   white-space: nowrap;
 }
 #core-head .core-od { color: #c9a86a; text-align: right; }
-#hp-num { font-size: 12px; color: var(--text); letter-spacing: 0.04em; margin-left: 3px; }
-#od-num { font-size: 11px; color: #ffe9a8; letter-spacing: 0.04em; margin-left: 3px; }
+#hp-num { font-size: 10px; color: var(--text); letter-spacing: 0.04em; margin-left: 3px; }
+#od-num { font-size: 9px; color: #ffe9a8; letter-spacing: 0.04em; margin-left: 3px; }
 #core-bar {
-  position: relative; margin-top: 5px; height: 14px; overflow: hidden;
+  position: relative; margin-top: 3px; height: 10px; overflow: hidden;
   background: rgba(2, 6, 16, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.09);
   clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
 }
-/* セグメントの刻み（上から薄く重ねる装飾） */
 #core-bar::after {
   content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  background: repeating-linear-gradient(90deg, transparent 0 31px, rgba(3, 6, 15, 0.55) 31px 33px);
+  background: repeating-linear-gradient(90deg, transparent 0 21px, rgba(3, 6, 15, 0.55) 21px 23px);
 }
 #hp-fill {
   position: absolute; left: 0; top: 0; z-index: 1;
-  height: 9px; width: 100%;
+  height: 6px; width: 100%;
   background: linear-gradient(90deg, #0e7d94, var(--cyan));
   box-shadow: 0 0 12px rgba(34, 230, 255, 0.7);
   transition: width 0.18s ease-out, background 0.3s;
@@ -129,15 +128,13 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #hp-fill.low { background: linear-gradient(90deg, #a11212, #ff4040); box-shadow: 0 0 12px rgba(255, 64, 64, 0.8); }
 #od-fill {
   position: absolute; left: 0; bottom: 0; z-index: 2;
-  height: 4px; width: 0%;
+  height: 3px; width: 0%;
   border-top: 1px solid rgba(2, 6, 16, 0.8);
   background: linear-gradient(90deg, #8a5f06, #ffc233, #ffe9a8);
   box-shadow: 0 0 10px rgba(255, 194, 51, 0.6);
   transition: width 0.15s ease-out;
 }
-/* 満タンが近づくとバー全体が明滅して知らせる */
 #core-wrap.nearfull #core-bar { animation: odBlink 0.55s ease-in-out infinite; }
-/* 発動中はフレームごと金色に光り、下段ラインが残り時間として減っていく */
 #core-wrap.active {
   border-color: rgba(255, 194, 51, 0.8);
   border-left-color: #ffc233;
@@ -150,48 +147,49 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 #core-wrap.active .core-od, #core-wrap.active #od-num { color: #ffd968; }
 @keyframes odBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-/* ---------- 子機HUD（HP／ODバーの下） ---------- */
+/* ---------- 子機HUD（HP／ODバーの下・小型） ---------- */
 #drone-row {
-  margin-top: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
-  pointer-events: none;
+  margin-top: 4px; display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+  pointer-events: none; opacity: 0.72;
 }
 #drone-row[hidden] { display: none; }
 .drone-chip {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 2px 7px 2px 4px;
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 1px 5px 1px 3px;
   background: rgba(8, 16, 36, 0.62);
   border: 1px solid rgba(140, 190, 230, 0.3);
-  font-family: Orbitron, monospace; font-size: 11px; color: var(--text);
+  font-family: Orbitron, monospace; font-size: 9px; color: var(--text);
 }
-.drone-chip svg { width: 15px; height: 15px; overflow: visible; }
+.drone-chip svg { width: 12px; height: 12px; overflow: visible; }
 .drone-chip.down {
   color: #7e8fa3; border-color: rgba(140, 160, 190, 0.22);
-  font-family: "Hiragino Kaku Gothic ProN", sans-serif; font-size: 10px;
-  padding: 2px 6px;
+  font-family: "Hiragino Kaku Gothic ProN", sans-serif; font-size: 9px;
+  padding: 1px 5px;
 }
 
-/* ---------- ボスバー（画面上部中央、ボス戦中だけ表示） ---------- */
+/* ---------- ボスバー（画面上端に寄せて細く・半透明） ---------- */
 #boss-wrap {
-  position: absolute; left: 50%; top: calc(10px + env(safe-area-inset-top));
+  position: absolute; left: 50%; top: 1px;
   transform: translateX(-50%);
-  width: min(430px, 46vw);
-  padding: 6px 10px 8px;
-  background: linear-gradient(115deg, rgba(16, 34, 56, 0.88), rgba(5, 10, 22, 0.66));
-  border: 1px solid rgba(127, 216, 255, 0.5);
+  width: min(360px, 42vw);
+  padding: 3px 8px 4px;
+  opacity: 0.78;
+  background: linear-gradient(115deg, rgba(16, 34, 56, 0.8), rgba(5, 10, 22, 0.55));
+  border: 1px solid rgba(127, 216, 255, 0.45);
   clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
-  box-shadow: 0 0 16px rgba(127, 216, 255, 0.22);
+  box-shadow: 0 0 12px rgba(127, 216, 255, 0.18);
   pointer-events: none;
 }
 #boss-wrap[hidden] { display: none; }
 #boss-head {
   display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-  font-family: Orbitron, monospace; font-size: 9px; letter-spacing: 0.24em;
+  font-family: Orbitron, monospace; font-size: 8px; letter-spacing: 0.22em;
   color: #bfefff; white-space: nowrap;
 }
-#boss-phase { color: var(--text-dim); letter-spacing: 0.18em; }
+#boss-phase { color: var(--text-dim); letter-spacing: 0.16em; }
 #boss-wrap.phase2 #boss-phase { color: #ff8a8a; }
 #boss-bar {
-  margin-top: 4px; height: 8px; overflow: hidden;
+  margin-top: 2px; height: 5px; overflow: hidden;
   background: rgba(2, 6, 16, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
@@ -202,19 +200,17 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   transition: width 0.15s ease-out;
 }
 #boss-wrap.phase2 #boss-fill { background: linear-gradient(90deg, #a13232, #ff6a5e, #ffc9a8); box-shadow: 0 0 10px rgba(255, 106, 94, 0.7); }
-/* 処刑フェイズ突入時、バーが砕けて消える */
 #boss-wrap.shatter { animation: bossShatter 0.6s ease-in forwards; }
 @keyframes bossShatter {
-  0% { transform: translateX(-50%); opacity: 1; }
+  0% { transform: translateX(-50%); opacity: 0.78; }
   20% { transform: translateX(calc(-50% - 5px)) rotate(-1.2deg); }
-  45% { transform: translateX(calc(-50% + 5px)) rotate(1deg); opacity: 0.9; }
-  70% { transform: translateX(calc(-50% - 3px)) translateY(5px) rotate(-0.6deg); opacity: 0.45; }
+  45% { transform: translateX(calc(-50% + 5px)) rotate(1deg); opacity: 0.7; }
+  70% { transform: translateX(calc(-50% - 3px)) translateY(5px) rotate(-0.6deg); opacity: 0.35; }
   100% { transform: translateX(-50%) translateY(12px); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   #boss-wrap.shatter { animation-duration: 0.15s; }
 }
-/* 発動中だけ画面の縁を金色に光らせる層 */
 #od-glow {
   position: absolute; inset: 0; pointer-events: none; z-index: 2;
   box-shadow: inset 0 0 72px rgba(255, 194, 51, 0.5), inset 0 0 20px rgba(255, 194, 51, 0.65);
@@ -226,7 +222,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   #core-wrap.nearfull #core-bar, #od-glow.on { animation: none; }
 }
 
-/* ---------- overlays ---------- */
+/* ---------- overlays（共通） ---------- */
 .overlay {
   position: absolute; inset: 0; z-index: 10;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -236,6 +232,14 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   overflow-y: auto;
 }
 .overlay[hidden] { display: none; }
+
+/* ---------- タイトル画面：中央に主要要素だけ、スクロールなし ---------- */
+#ov-title { overflow: hidden; background: rgba(8, 14, 32, 0.66); }
+.title-center {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  max-width: 100%;
+}
 .game-title {
   font-family: Orbitron, monospace; font-weight: 900;
   font-size: clamp(30px, 6.5vw, 48px); letter-spacing: 0.06em; line-height: 1.05;
@@ -251,8 +255,79 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 @media (orientation: portrait) {
   .rotate-note { display: block; }
 }
+/* 右下のサブボタン群（操作方法／敵図鑑／設定） */
+.title-corner {
+  position: absolute; right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 2; display: flex; gap: 8px;
+}
+.corner-btn {
+  min-height: 38px; padding: 0 16px;
+  font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif; font-size: 13px; font-weight: 700;
+  color: var(--cyan); background: rgba(8, 16, 36, 0.72);
+  border: 1px solid rgba(34, 230, 255, 0.5); border-radius: 3px; cursor: pointer;
+}
+.corner-btn:active { background: rgba(34, 230, 255, 0.2); }
+
+/* タイトル背景：敵の図形がゆっくり回転しながら上から降ってくる */
+.falling-layer {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none;
+}
+.fall-shape {
+  position: absolute; top: -64px; display: block; pointer-events: none;
+  filter: saturate(0.65) brightness(0.72);
+  animation-name: fallSpin; animation-timing-function: linear; animation-iteration-count: infinite;
+  will-change: transform;
+}
+.fall-shape svg { width: 100%; height: 100%; overflow: visible; display: block; }
+@keyframes fallSpin {
+  0% { transform: translate(0, -80px) rotate(0deg); }
+  50% { transform: translate(var(--sway, 0px), 55dvh) rotate(180deg); }
+  100% { transform: translate(0, 112dvh) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fall-shape { animation: none; display: none; }
+}
+
+/* ---------- 専用パネル（操作方法／敵図鑑／設定） ---------- */
+.panel-overlay {
+  position: absolute; inset: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px;
+  background: rgba(3, 6, 16, 0.72);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.panel-overlay[hidden] { display: none; }
+.panel {
+  width: min(620px, 96%);
+  max-height: 92%;
+  display: flex; flex-direction: column;
+  background: rgba(8, 15, 34, 0.97);
+  border: 1px solid rgba(34, 230, 255, 0.45);
+  box-shadow: 0 0 28px rgba(34, 230, 255, 0.16);
+  padding: 14px 18px 16px;
+  text-align: left;
+}
+.panel-zukan { width: min(880px, 97%); }
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex: none;
+}
+.panel-title {
+  margin: 0; font-family: Orbitron, monospace; font-weight: 700; font-size: 17px;
+  letter-spacing: 0.22em; color: var(--text);
+}
+.panel-close {
+  min-height: 34px; padding: 0 14px; flex: none;
+  font-size: 13px; font-weight: 700; color: var(--cyan);
+  background: rgba(8, 16, 36, 0.6); border: 1px solid rgba(34, 230, 255, 0.5);
+  border-radius: 3px; cursor: pointer;
+}
+.panel-close:active { background: rgba(34, 230, 255, 0.2); }
+.panel-body { overflow-y: auto; margin-top: 10px; }
+
+/* 操作方法パネル内の説明リスト */
 .howto {
-  margin: 18px 0 0; padding: 0; list-style: none;
+  margin: 0; padding: 0; list-style: none;
   display: flex; flex-direction: column; gap: 7px;
   font-size: 13.5px; line-height: 1.5; color: var(--text);
   text-align: left;
@@ -262,21 +337,66 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   font-family: Orbitron, monospace; font-size: 10px; letter-spacing: 0.18em; color: var(--cyan);
   text-align: right;
 }
+
+/* 敵図鑑パネル：横一列カード＋横スクロール */
+.zukan-note {
+  margin: 8px 0 0; flex: none;
+  font-size: 11px; letter-spacing: 0.05em; color: var(--text-dim);
+}
+.zukan-scroll {
+  margin-top: 10px; overflow-x: auto; overflow-y: hidden; flex: none;
+  padding-bottom: 8px;
+  scrollbar-color: rgba(34, 230, 255, 0.5) rgba(8, 16, 36, 0.6);
+}
 .enemy-legend {
-  margin-top: 16px; display: flex; gap: 14px 14px; justify-content: center;
-  flex-wrap: wrap; max-width: 920px;
+  display: flex; flex-wrap: nowrap; gap: 10px; justify-content: flex-start;
+  width: max-content;
   font-size: 11px; color: var(--text-dim);
 }
-.enemy-legend .legend-note {
-  width: 100%; margin: 0; text-align: center;
-  font-size: 11px; letter-spacing: 0.06em; color: var(--text-dim);
+.enemy-legend figure {
+  margin: 0; width: 158px; flex: none;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  background: rgba(10, 20, 44, 0.75);
+  border: 1px solid rgba(120, 180, 220, 0.28);
+  padding: 12px 11px;
 }
-.enemy-legend figure { margin: 0; width: 176px; display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.enemy-legend svg { width: 26px; height: 26px; overflow: visible; flex: none; }
-.enemy-legend figcaption { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
-.enemy-legend .lg-name { color: var(--text); font-weight: 700; font-size: 11.5px; line-height: 1.3; }
+.enemy-legend svg { width: 30px; height: 30px; overflow: visible; flex: none; }
+.enemy-legend figcaption { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; }
+.enemy-legend .lg-name { color: var(--text); font-weight: 700; font-size: 12px; line-height: 1.35; }
 .enemy-legend .lg-stat { color: var(--cyan); font-size: 11px; font-variant-numeric: tabular-nums; line-height: 1.3; }
-.enemy-legend .lg-desc { color: var(--text-dim); font-size: 10.5px; line-height: 1.45; }
+.enemy-legend .lg-desc { color: var(--text-dim); font-size: 10.5px; line-height: 1.5; }
+
+/* 設定パネル：タブ式 */
+.settings-tabs { display: flex; gap: 6px; margin-top: 12px; flex: none; }
+.stab-btn {
+  min-height: 36px; padding: 0 18px;
+  font-size: 13px; font-weight: 700; color: var(--text-dim);
+  background: rgba(8, 16, 36, 0.55); border: 1px solid rgba(140, 180, 210, 0.35);
+  border-radius: 3px; cursor: pointer;
+}
+.stab-btn.selected {
+  color: #031018; background: var(--cyan); border-color: var(--cyan);
+  box-shadow: 0 0 12px rgba(34, 230, 255, 0.45);
+}
+.settings-pane { margin-top: 14px; overflow-y: auto; }
+.settings-pane[hidden] { display: none; }
+.vol-row { display: flex; align-items: center; gap: 12px; }
+.vol-label { font-size: 13px; font-weight: 700; color: var(--text); flex: none; }
+#vol-range { flex: 1; min-width: 0; accent-color: var(--cyan); height: 28px; cursor: pointer; }
+.vol-value { font-family: Orbitron, monospace; font-size: 13px; color: var(--cyan); min-width: 3.4em; text-align: right; font-variant-numeric: tabular-nums; }
+.setting-action {
+  margin-top: 12px; width: 100%; min-height: 42px; padding: 0 16px;
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  font-size: 14px; font-weight: 700; color: var(--cyan);
+  background: rgba(8, 16, 36, 0.55); border: 1px solid rgba(34, 230, 255, 0.5);
+  border-radius: 3px; cursor: pointer;
+}
+.setting-action svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.setting-action:active { background: rgba(34, 230, 255, 0.18); }
+.setting-action.danger { color: #ff8a8a; border-color: rgba(255, 90, 90, 0.5); }
+#settings-game-actions[hidden] { display: none; }
+.setting-note { margin: 12px 0 0; font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+
 .big-btn {
   margin-top: 22px;
   min-height: 50px; padding: 0 44px;
@@ -287,13 +407,11 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   box-shadow: 0 0 24px rgba(34, 230, 255, 0.55);
 }
 .big-btn:active { transform: scale(0.97); }
-/* STARTと全画面ボタンの並び（タイトル画面） */
 .btn-row {
   margin-top: 22px;
   display: flex; gap: 12px; align-items: stretch; justify-content: center; flex-wrap: wrap;
 }
 .btn-row .big-btn { margin-top: 0; }
-/* 全画面ボタン：アイコンだけでなく文字でも示し、タイトル画面から直接押せるようにする */
 .sub-btn {
   min-height: 50px; padding: 0 22px;
   display: inline-flex; align-items: center; gap: 9px;
@@ -303,6 +421,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 }
 .sub-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .sub-btn:active { background: rgba(34, 230, 255, 0.18); }
+
 /* ---------- 難易度セレクタ（タイトル／リトライ画面） ---------- */
 .diff-select {
   margin-top: 20px;
@@ -345,18 +464,14 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   font-family: Orbitron, monospace; font-weight: 700; font-size: 26px; letter-spacing: 0.3em; margin: 0;
   color: var(--text); text-shadow: 0 0 14px rgba(34, 230, 255, 0.6);
 }
-/* 背の低い画面（横向きスマホ等）では説明を詰めて収める。
-   縦持ちスマホは画面自体が高くてもステージは横長で背が低いため、
-   ビューポートの高さではなく向き＋幅でも判定する。中央寄せのまま
-   はみ出すと上側が見切れて届かなくなるので、上端から並べる。 */
+
+/* 背の低い画面（横向きスマホ等）では中央要素を詰めて収める */
 @media (max-height: 500px), (orientation: portrait) and (max-width: 900px) {
-  .overlay { padding: 10px 18px; justify-content: flex-start; }
+  .overlay { padding: 10px 18px; }
   .game-title { font-size: 24px; }
   .tagline { margin-top: 4px; font-size: 11px; }
   .rotate-note { margin-top: 4px; font-size: 11px; }
-  .howto { margin-top: 8px; gap: 3px; font-size: 11.5px; }
-  .enemy-legend { margin-top: 8px; }
-  .enemy-legend svg { width: 18px; height: 18px; }
+  .howto { gap: 3px; font-size: 11.5px; }
   .big-btn { margin-top: 10px; min-height: 42px; font-size: 14px; }
   .btn-row { margin-top: 10px; }
   .sub-btn { min-height: 42px; font-size: 12px; padding: 0 16px; }
@@ -364,39 +479,29 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .diff-btn { min-height: 34px; font-size: 12px; padding: 0 12px; }
   .diff-note { display: none; }
   .result-grid { margin-top: 10px; }
+  .title-corner { right: 8px; bottom: 8px; gap: 6px; }
+  .corner-btn { min-height: 32px; font-size: 12px; padding: 0 12px; }
+  .panel { padding: 10px 12px 12px; }
+  .enemy-legend figure { width: 138px; padding: 9px 9px; }
 }
-/* 縦持ちではステージの高さが画面幅の9/16（幅360pxなら約200px）
-   しかなく、通常レイアウトでは説明文が縦に積み上がって
-   START／全画面ボタンがステージ下端からはみ出し見切れてしまう。
-   HUDボタン列（上端から約44px）と重ならない上余白を確保した上で、
-   ほかを詰めてボタン列までをステージ内に収める。 */
+/* 縦持ちではステージの高さが小さいため、タイトル中央要素をさらに詰め、
+   右下ボタンと重ならないよう余白を確保する */
 @media (orientation: portrait) and (max-width: 900px) {
-  .enemy-legend { display: none; }
   .tagline { display: none; }
-  .overlay { padding: 46px 12px 8px; }
+  #ov-title { padding: 8px 12px 44px; }
   .game-title { font-size: 21px; }
   .rotate-note { margin-top: 3px; font-size: 10.5px; }
-  .howto { margin-top: 6px; gap: 1px; font-size: 10.5px; line-height: 1.3; }
-  .howto .k { min-width: 5.4em; margin-right: 5px; font-size: 8.5px; }
-  .howto .pc-row { display: none; }
-  .howto .weapon-row { display: none; }
-  .howto .od-row { display: none; }
-  .howto .drone-row { display: none; }
-  .howto .boss-row { display: none; }
-  .icon-btn { width: 36px; height: 36px; min-height: 36px; }
   .btn-row { margin-top: 8px; gap: 8px; flex-wrap: nowrap; }
   .diff-select { margin-top: 6px; gap: 6px; }
   .diff-label { display: none; }
   .diff-btn { min-height: 30px; font-size: 11px; padding: 0 10px; }
   .big-btn { min-height: 36px; font-size: 13px; padding: 0 24px; }
   .sub-btn { min-height: 36px; font-size: 11px; padding: 0 12px; white-space: nowrap; }
+  .title-corner { right: 6px; bottom: 6px; }
+  .corner-btn { min-height: 30px; font-size: 11px; padding: 0 10px; }
   .over-title { font-size: 26px; }
   .result-grid { margin-top: 8px; gap: 3px 20px; }
   .result-grid dd { font-size: 20px; }
   .result-grid dd.small { font-size: 15px; }
-}
-/* 幅の狭い縦持ちでは GOAL の行も畳み、操作説明2行と
-   ボタン列がステージ内に収まることを優先する */
-@media (orientation: portrait) and (max-width: 480px) {
-  .howto .goal-row { display: none; }
+  .howto .k { min-width: 5.4em; margin-right: 5px; font-size: 8.5px; }
 }
