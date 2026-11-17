@@ -58,7 +58,8 @@ var OD_GAIN = {
   splitter: 8, splitter2: 6, splitter3: 4, splitlet: 3,
   tank: 30, spiral: 12, guardian: 10, bomber: 6,
   froster: 6, sniper: 7, amp: 8,
-  healer: 10, arc: 6, stepper: 5
+  healer: 10, arc: 6, stepper: 5,
+  deadeye: 16, aegis: 20, cyclone: 24
 };
 
 // ---- 演出オブジェクトの同時発生上限（軽量化） ----
@@ -116,6 +117,36 @@ var SNIPE_TELEGRAPH_TIME = 0.75; // 照準線の予告時間（秒）
 var SNIPE_LOCK_TIME = 0.2;       // 発射の何秒前から照準が固定されるか（この間は自機を追わない）
 var SNIPER_BULLET_SPEED_MUL = 2.2; // 狙撃弾は通常の敵弾の約2.2倍速（ダメージは通常弾と同じ-10）
 var SNIPE_COOLDOWN = 2.4;        // 発射後のクールダウン（秒）
+
+// ---- 上位種（デッドアイ／イージス／サイクロン）の数値 ----
+// 元の敵の出現抽選のうち、ELITE_UNLOCK_TIME 以降は ELITE_UPGRADE_PROB の
+// 割合で対応する上位種に格上げされる（ボス戦中は通常湧き自体が止まる）。
+var ELITE_UNLOCK_TIME = 150;     // 格上げが始まる経過時間（秒）
+var ELITE_UPGRADE_PROB = 0.25;   // 格上げ確率（対象はスパイラル／ガーディアン／スナイパー）
+// デッドアイ（スナイパー上位種）：間合い480、予告0.6秒、高速弾2連射。
+// サイクル全体（予告＋連射間隔＋クールダウン）は元の約0.7倍で繰り返す：
+// 元＝0.75＋2.4＝3.15秒 → 0.7倍＝2.205秒。0.6＋0.15＋1.455＝2.205秒に一致。
+var DEADEYE_RANGE = 480;
+var DEADEYE_TELEGRAPH_TIME = 0.6;
+var DEADEYE_BURST_COUNT = 2;
+var DEADEYE_BURST_INTERVAL = 0.15;
+var DEADEYE_LOCK_TIME = 0.14;    // 発射前に照準が固定される時間（元の0.2の0.7倍）
+var DEADEYE_COOLDOWN = 1.455;    // 発射後のクールダウン（サイクル全体が元の0.7倍になる値）
+// ガーディアン系の盾：正面の半角（この角度内から当たった弾を防ぐ）。
+// オリジナルは半角90°（正面半分）。イージスは角度が元の1.5倍＝半角135°。
+var GUARDIAN_SHIELD_HALF = Math.PI / 2;
+var AEGIS_SHIELD_HALF = Math.PI * 0.75;
+// イージスの防御オーラ：半径内の他の敵の被ダメージを20%カット（重複なし）
+var AEGIS_AURA_RADIUS = 200;
+var AEGIS_AURA_CUT = 0.2;
+// サイクロン（スパイラル上位種）：自機を中心に公転する。
+var CYCLONE_ORBIT_RADIUS = 300;  // 公転半径（px）
+var CYCLONE_ORBIT_PERIOD = 15;   // 公転周期（秒／1周）
+// 公転の接線速度＝2π×半径÷周期≒125.7px/秒（難易度倍率は生成時に適用）
+var CYCLONE_ORBIT_SPEED = Math.PI * 2 * CYCLONE_ORBIT_RADIUS / CYCLONE_ORBIT_PERIOD;
+// 子機ドロップ率：元の4種（スパイラル／ガーディアン／スナイパー／アンプ）は20%。
+// 上位種3体は確定（100%）。タンクはドロップなし。
+var DRONE_DROP_PROB = 0.2;
 
 // ---- アンプの数値 ----
 var AMP_RANGE = 330;             // 自機からこの距離あたりを漂う（drift部品）

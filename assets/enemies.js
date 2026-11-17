@@ -66,27 +66,28 @@ var ENEMY_TYPES = {
     movement: "chase", attack: "none", speed: [138, 168], rotMode: "none",
     gen: 3
   },
-  tank: { // タンク：大きな円。高耐久で3方向拡散弾（威力は控えめ）
+  tank: { // タンク：大きな円。高耐久で3方向拡散弾（威力は控えめ）。子機ドロップはなし
     shape: "circle", color: "#e8ecf2", r: 28, hp: 10, score: 800,
-    name: "タンク", desc: "3方向拡散弾、体力バー付き。倒すとランダムな子機カプセル",
+    name: "タンク", desc: "3方向拡散弾、体力バー付き。子機はドロップしない",
     icon: '<circle cx="0" cy="0" r="13" fill="none" stroke="#e8ecf2" stroke-width="3"/><circle cx="0" cy="0" r="6" fill="none" stroke="#e8ecf2" stroke-width="2"/>',
     movement: "chase", attack: "spread", speed: [38, 52],
     fireInterval: [0.9, 1.2], rotMode: "none" // 発射間隔は従来の半分（レート2倍）。弾の威力（-5）は不変
   },
   spiral: { // スパイラル：星形。回転弾幕（威力は控えめ）
     shape: "star", color: "#ffd51f", r: 17, hp: 3, score: 400,
-    name: "スパイラル", desc: "回転弾幕。倒すとアタッカーをドロップ",
+    name: "スパイラル", desc: "回転弾幕。20%でアタッカーをドロップ",
     icon: '<path d="M0 -14 L4 -4 L14 -4 L6 3 L9 13 L0 7 L-9 13 L-6 3 L-14 -4 L-4 -4 Z" fill="none" stroke="#ffd51f" stroke-width="2.5"/>',
     movement: "chase", attack: "spiral", speed: [62, 80],
     fireInterval: [0.13, 0.17], rotMode: "spin"
   },
   guardian: { // ガーディアン：正面の盾で正面からの弾を防ぐ
-    // 盾の旋回速度（turnSpeed, rad/秒）は従来の半分に抑え、回り込めるようにした
+    // 盾の旋回速度（turnSpeed, rad/秒）は従来（2.6）の約1/3に極端に下げ、
+    // 回り込んで背後・側面を取ることが現実的にできるようにした
     shape: "guardian", color: "#2d7bff", r: 17, hp: 2, score: 350,
-    name: "ガーディアン", desc: "正面の盾で弾を防ぐ。倒すとガードをドロップ",
+    name: "ガーディアン", desc: "正面の盾で弾を防ぐ（旋回は遅い）。20%でガードをドロップ",
     icon: '<circle cx="0" cy="3" r="9" fill="none" stroke="#2d7bff" stroke-width="3"/><path d="M-13 -6 A14 14 0 0 1 13 -6" fill="none" stroke="#9fd0ff" stroke-width="4"/>',
     movement: "guardianChase", attack: "none", speed: [72, 94], rotMode: "face",
-    turnSpeed: 2.6
+    turnSpeed: 0.87, shieldHalf: GUARDIAN_SHIELD_HALF
   },
   bomber: { // ボマー：丸。近づくと点滅して自爆し、周囲を巻き込む（耐久は2倍の2／移動速度は20%上げた）
     shape: "circle", color: "#ff2a2a", r: 15, hp: 2, score: 200,
@@ -102,13 +103,14 @@ var ENEMY_TYPES = {
   },
   sniper: { // スナイパー：細長い矢じり。間合いを保ち（距離維持）、照準線で予告してから高速弾を撃つ（狙撃）
     shape: "arrowhead", color: "#b6ff2e", r: 14, hp: 1.5, score: 250,
-    name: "スナイパー", desc: "間合い430、照準線0.75秒の予告のあと高速弾。倒すとスナイパー型子機をドロップ",
+    name: "スナイパー", desc: "間合い430、照準線0.75秒の予告のあと高速弾。20%でスナイパー型子機をドロップ",
     icon: '<path d="M0 -15 L6 9 L0 3 L-6 9 Z" fill="none" stroke="#b6ff2e" stroke-width="2.5"/>',
-    movement: "keepDistance", attack: "snipe", speed: [150, 178], rotMode: "face"
+    movement: "keepDistance", attack: "snipe", speed: [150, 178], rotMode: "face",
+    keepRange: SNIPER_RANGE
   },
   amp: { // アンプ：ピンクのリング。攻撃せず漂い、パルスで周囲の敵を強化する支援型（自身はバフを受けない）
     shape: "ring", color: "#ff5fc8", r: 16, hp: 2.5, score: 300,
-    name: "アンプ", desc: "2.8秒ごとにパルス（半径260）で周囲の敵を強化（移動+20%・3秒、ダメージ無効0.5秒）。倒すとブースターをドロップ",
+    name: "アンプ", desc: "2.8秒ごとにパルス（半径260）で周囲の敵を強化（移動+20%・3秒、ダメージ無効0.5秒）。20%でブースターをドロップ",
     icon: '<circle cx="0" cy="0" r="10" fill="none" stroke="#ff5fc8" stroke-width="5"/>',
     movement: "drift", attack: "pulse", speed: [70, 88], rotMode: "spin",
     fireInterval: [2.8, 2.8] // パルスの間隔（AMP_PULSE_INTERVAL と同値）
@@ -131,6 +133,27 @@ var ENEMY_TYPES = {
     name: "ステッパー", desc: "上下左右にだけ、個体ごとの歩幅（56〜84px）を素早く進んでは止まる。射撃なし",
     icon: '<path d="M-4 -12 H4 V-4 H12 V4 H4 V12 H-4 V4 H-12 V-4 H-4 Z" fill="none" stroke="#a06bff" stroke-width="2.6"/>',
     movement: "step", attack: "none", speed: [0, 0], rotMode: "none" // 移動は歩幅と時間で決まる（step部品側で計算）
+  },
+  deadeye: { // デッドアイ（スナイパー上位種）：約1.5倍＋四角い装甲。間合い480、予告0.6秒で高速弾2連射、サイクルは元の約0.7倍速
+    shape: "arrowhead", color: "#d8ff3d", r: 21, hp: 4.5, score: 800,
+    name: "デッドアイ", desc: "スナイパーの上位種。間合い480、照準線0.6秒の予告のあと高速弾を2連射（サイクルは元の約0.7倍速）。スナイパー型子機を確定ドロップ",
+    icon: '<path d="M0 -15 L6 9 L0 3 L-6 9 Z" fill="none" stroke="#d8ff3d" stroke-width="2.5"/><rect x="-13" y="-13" width="7" height="7" fill="none" stroke="#d8ff3d" stroke-width="2"/><rect x="6" y="6" width="7" height="7" fill="none" stroke="#d8ff3d" stroke-width="2"/>',
+    movement: "keepDistance", attack: "deadsnipe", speed: [150, 178], rotMode: "face",
+    keepRange: DEADEYE_RANGE, elite: true
+  },
+  aegis: { // イージス（ガーディアン上位種）：約1.5倍＋四角い装甲。盾は元の1.5倍の角度、旋回は極端に遅く、移動は元より少し遅い。周囲の敵への防御オーラ持ち
+    shape: "aegis", color: "#3d8bff", r: 26, hp: 6, score: 1000,
+    name: "イージス", desc: "ガーディアンの上位種。正面シールドは元の1.5倍の角度（旋回は遅い）。半径200pxの防御オーラで周囲の敵の被ダメージを20%カット（重複なし）。ガードを確定ドロップ",
+    icon: '<circle cx="0" cy="3" r="9" fill="none" stroke="#3d8bff" stroke-width="3"/><path d="M-14 -3 A14.5 14.5 0 0 1 14 -3" fill="none" stroke="#9fd0ff" stroke-width="4"/><rect x="-13" y="7" width="6" height="6" fill="none" stroke="#3d8bff" stroke-width="2"/><rect x="7" y="7" width="6" height="6" fill="none" stroke="#3d8bff" stroke-width="2"/>',
+    movement: "guardianChase", attack: "none", speed: [62, 82], rotMode: "face",
+    turnSpeed: 0.87, shieldHalf: AEGIS_SHIELD_HALF, elite: true
+  },
+  cyclone: { // サイクロン（スパイラル上位種）：約1.5倍＋四角い装甲。自機の周りを公転しながら二重螺旋弾幕
+    shape: "star", color: "#ffb31f", r: 26, hp: 7.5, score: 1200,
+    name: "サイクロン", desc: "スパイラルの上位種。自機を中心に半径約300pxを公転しながら二重螺旋の弾幕（発射間隔は元の約0.8倍）。アタッカーを確定ドロップ",
+    icon: '<path d="M0 -14 L4 -4 L14 -4 L6 3 L9 13 L0 7 L-9 13 L-6 3 L-14 -4 L-4 -4 Z" fill="none" stroke="#ffb31f" stroke-width="2.5"/><rect x="-13" y="-13" width="6" height="6" fill="none" stroke="#ffb31f" stroke-width="2"/><rect x="7" y="7" width="6" height="6" fill="none" stroke="#ffb31f" stroke-width="2"/>',
+    movement: "orbitPlayer", attack: "doubleSpiral", speed: [125.7, 125.7], rotMode: "spin",
+    fireInterval: [0.104, 0.136], elite: true // 元スパイラル（0.13〜0.17）の約0.8倍
   }
 };
 
@@ -140,7 +163,7 @@ var ENEMY_TYPES = {
    スコアは hp / score から換算するので、図鑑だけが古い数値に
    なることはない。ボスは config.js の BOSS_* から組み立てる。
    ============================================================ */
-var ENEMY_ZUKAN_ORDER = ["square", "diamond", "hexagon", "darter", "splitter", "tank", "spiral", "guardian", "bomber", "froster", "sniper", "amp", "healer", "arc", "stepper"];
+var ENEMY_ZUKAN_ORDER = ["square", "diamond", "hexagon", "darter", "splitter", "tank", "spiral", "cyclone", "guardian", "aegis", "bomber", "froster", "sniper", "deadeye", "amp", "healer", "arc", "stepper"];
 function zukanFmtNum(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 function zukanMulText(v) { return v === Math.floor(v) ? v.toFixed(1) : String(v); }
 function zukanFigureHtml(icon, name, stat, desc) {
