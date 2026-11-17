@@ -317,8 +317,8 @@ function spawnBoss() {
     execHp: 0, execMax: Math.round(BOSS_EXEC_HP * mul), execTimer: 0,
     totalMax: coreMax + turretMax * 2,
     turrets: [
-      { side: -1, hp: turretMax, maxHp: turretMax, alive: true, x: 0, y: 0, aim: 0, fireTimer: 0.5, swingPhase: 0, flash: 0, mode: "spread", modeTimer: BOSS_TURRET_SPREAD_TIME, burstLeft: 0, burstTimer: 0 },
-      { side: 1, hp: turretMax, maxHp: turretMax, alive: true, x: 0, y: 0, aim: 0, fireTimer: 0.65, swingPhase: Math.PI, flash: 0, mode: "spread", modeTimer: BOSS_TURRET_SPREAD_TIME - turretCycleHalf, burstLeft: 0, burstTimer: 0 }
+      { side: -1, hp: turretMax, maxHp: turretMax, alive: true, wreck: false, x: 0, y: 0, aim: 0, fireTimer: 0.5, swingPhase: 0, flash: 0, mode: "spread", modeTimer: BOSS_TURRET_SPREAD_TIME, burstLeft: 0, burstTimer: 0 },
+      { side: 1, hp: turretMax, maxHp: turretMax, alive: true, wreck: false, x: 0, y: 0, aim: 0, fireTimer: 0.65, swingPhase: Math.PI, flash: 0, mode: "spread", modeTimer: BOSS_TURRET_SPREAD_TIME - turretCycleHalf, burstLeft: 0, burstTimer: 0 }
     ],
     iceTimer: 2.2,
     iceInterval: Math.max(BOSS_ICE_MIN_INTERVAL, BOSS_ICE_INTERVAL * Math.pow(0.93, bossSpawnCount - 1)),
@@ -557,7 +557,7 @@ function landIceShot(s) {
 
 // 砲塔の破壊：スコアのみ（ゲージは増えない）。両方壊れると第2段階へ
 function destroyTurret(tr) {
-  tr.alive = false; tr.hp = 0;
+  tr.alive = false; tr.wreck = false; tr.hp = 0;
   score += BOSS_SCORE_TURRET;
   burst(tr.x, tr.y, "#7fd8ff", 22);
   spawnRing(tr.x, tr.y, "#7fd8ff", 4);
@@ -581,9 +581,17 @@ function destroyTurret(tr) {
   }
 }
 
-// 本体を倒し切った：処刑フェイズへ。ゲージ満タンでOD発動、タイマーは止まる
+// 本体を倒し切った：処刑フェイズへ。ゲージ満タンでOD発動、タイマーは止まる。
+// 砲塔が残ったまま本体を倒した場合、残っていた砲塔はこの時点で機能を
+// 停止し、残骸の一部として本体に付いたまま無力化する。個別の破壊得点
+// （BOSS_SCORE_TURRET）は付かず、destroyTurret は呼ばない（第2段階への
+// 移行も起きない）。処刑完了の大爆発で本体と一緒に消える。
 function enterExecution() {
   var b = boss;
+  for (var wi = 0; wi < b.turrets.length; wi++) {
+    var wtr = b.turrets[wi];
+    if (wtr.alive) { wtr.alive = false; wtr.wreck = true; wtr.hp = 0; wtr.flash = 0; }
+  }
   b.phase = "exec";
   b.execHp = b.execMax;
   b.execTimer = 0;
@@ -658,6 +666,13 @@ function bulletSegHit(b, x, y, rr) {
   return null;
 }
 
+// 残っている砲塔の数（本体ダメージ倍率とバリアの濃さに使う）
+function bossAliveTurretCount() {
+  if (!boss) return 0;
+  var n = 0;
+  for (var i = 0; i < boss.turrets.length; i++) if (boss.turrets[i].alive) n++;
+  return n;
+}
 // 当たり判定：自機の弾 × ボス（砲塔→本体の順）
 function bossBulletCollisions() {
   if (!boss) return;
@@ -686,24 +701,26 @@ function bossBulletCollisions() {
     if (bl.pierce && bl.hitUids.bossBody) continue;
     hit = bulletSegHit(bl, b.x, b.y, b.r + bl.r);
     if (!hit) continue;
-    if (b.phase === 1) {
-      // バリア：どの弾も弾かれて消える（貫通弾も通らない）
-      bl.dead = true;
-      b.shieldFlash = 0.16;
-      spawnSparks(hit.x, hit.y, "#bfefff", 4);
-      continue;
-    }
     if (bl.pierce) bl.hitUids.bossBody = true; else bl.dead = true;
     b.flash = 0.09;
-    spawnSparks(hit.x, hit.y, b.phase === "exec" ? "#ffc233" : "#7fd8ff", 3);
     if (b.phase === "exec") {
+      spawnSparks(hit.x, hit.y, "#ffc233", 3);
       // サンドバッグ：撃たれるたびに震え、破片を落とす
       b.execHp -= bl.dmg;
       b.shakeT = 0.09;
       if (Math.random() < 0.4) burst(hit.x, hit.y, "#7fd8ff", 2);
       if (b.execHp <= 0) { startBossFinish(); return; }
     } else {
-      b.coreHp -= bl.dmg;
+      // 本体は第1段階からダメージを受ける。ただし残っている砲塔の数で
+      // 軽減される（2機×0.25／1機×0.5／0機×1.0）。削った分は第2段階へ
+      // そのまま持ち越される。砲塔が残っていても倒し切ることができ、
+      // HPが0になればそのまま処刑フェイズへ移行する（下限クランプなし）。
+      var aliveT = bossAliveTurretCount();
+      var dmgMul = BOSS_BODY_DMG_MUL[aliveT] != null ? BOSS_BODY_DMG_MUL[aliveT] : 1;
+      if (b.phase === 1) b.shieldFlash = 0.16;
+      // 軽減中は火花を小さめにして「通っているが軽減されている」手応えにする
+      spawnSparks(hit.x, hit.y, "#7fd8ff", dmgMul < 1 ? 2 : 3);
+      b.coreHp -= bl.dmg * dmgMul;
       if (b.coreHp <= 0) { enterExecution(); }
     }
   }
@@ -835,7 +852,7 @@ function updateDrones(dt) {
       }
     }
     d.x = clamp(d.x, 8, WORLD_W - 8); d.y = clamp(d.y, 8, WORLD_H - 8);
-    // ---- アタッカーの散弾 ----
+    // ---- アタッカーの散弾（全機共通） ----
     if (d.role === "attacker" && !d.down) {
       d.fireTimer -= dt;
       if (d.fireTimer <= 0) {
@@ -862,10 +879,9 @@ function droneAttackerFire(d) {
       dx = tr.x - d.x; dy = tr.y - d.y; d2 = dx * dx + dy * dy;
       if (d2 < bestD2) { bestD2 = d2; bestT = { x: tr.x, y: tr.y }; }
     }
-    if (boss.phase === 2 || boss.phase === "exec") {
-      dx = boss.x - d.x; dy = boss.y - d.y; d2 = dx * dx + dy * dy;
-      if (d2 < bestD2) { bestD2 = d2; bestT = { x: boss.x, y: boss.y }; }
-    }
+    // 本体は第1段階からダメージが通るので、常に照準候補に入れる
+    dx = boss.x - d.x; dy = boss.y - d.y; d2 = dx * dx + dy * dy;
+    if (d2 < bestD2) { bestD2 = d2; bestT = { x: boss.x, y: boss.y }; }
   }
   if (!bestT) return;
   var base = Math.atan2(bestT.y - d.y, bestT.x - d.x);
