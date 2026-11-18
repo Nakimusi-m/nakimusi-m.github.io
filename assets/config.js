@@ -396,6 +396,47 @@ var SHIELD_POP_TIME = 0.35;      // ガードのシールド再展開の膨ら�
 var ENGINE_PARTICLE_RATE = 55;   // エンジン粒子の発生レート（個/秒・移動中のみ）
 var RECORD_BANNER_TIME = 1.8;    // ゲーム中の NEW RECORD 表示（秒）
 
+// ---- グリッド背景の演出（見た目のみ。ゲーム数値は変えない） ----
+// 波紋：出来事の場所から光の輪がグリッド上を広がる
+var GRID_RIPPLE_SPEED = 600;     // 輪の広がる速さ（px/秒）
+var GRID_RIPPLE_MAX_R = 500;     // 輪の最大半径（px）
+var GRID_RIPPLE_LIFE = 0.8;      // 輪の寿命（秒。600×0.8=480≒最大半径で消える）
+var GRID_RIPPLE_MAX = 3;         // 同時に存在する輪の上限
+// 歪み：大きな爆発の時だけグリッドがたわむ。規模（爆発半径）に比例する：
+// 歪み半径＝爆発半径×1.8、たわみ量＝8×(爆発半径/130)^1.07、
+// 持続＝爆発半径130で0.35秒→333で0.5秒の範囲で比例。
+// 例：ボマー自爆（半径130）→歪み半径約234・たわみ約8px／
+// ボス登場の衝撃波（半径250）→約450・約16px／
+// 処刑の大爆発（半径333）→約600・約22px。
+var GRID_DISTORT_RATIO = 1.8;    // 歪み半径＝爆発半径×この倍率
+var GRID_DISTORT_REF_R = 130;    // たわみ量の基準になる爆発半径
+var GRID_DISTORT_REF_AMP = 8;    // 基準爆発半径でのたわみ量（px）
+var GRID_DISTORT_AMP_EXP = 1.07; // たわみ量の規模への追随（上の例に一致する指数）
+var GRID_DISTORT_TIME_MIN = 0.35, GRID_DISTORT_TIME_MAX = 0.5; // 持続の範囲（秒）
+var GRID_DISTORT_MAX = 4;        // 同時に存在する歪みの上限
+var BOSS_SPAWN_BLAST_R = 250;    // ボス登場の衝撃波の規模（爆発半径換算）
+var BOSS_FINAL_BLAST_R = 333;    // 処刑フェイズの大爆発の規模（爆発半径換算）
+// ボス登場時の波動：登場から約1.5秒の間に最大3回、ボス中心に波が広がり、
+// 通り道でグリッドの線そのものがうねって氷色に光る（波紋の輪とは別物）
+var BOSS_WAVE_COUNT = 3;         // 波の回数
+var BOSS_WAVE_INTERVAL = 0.5;    // 波と波の間隔（秒。3回で約1.5秒）
+var BOSS_WAVE_SPEED = 430;       // 波の広がる速さ（px/秒）
+var BOSS_WAVE_MAX_R = 640;       // 波の最大半径（px）
+var BOSS_WAVE_AMP = 8;           // 線のうねりの最大量（px）
+var BOSS_WAVE_BAND = 56;         // うねりが効く波面前後の幅（px）
+var BOSS_WAVE_MAX = 3;           // 同時に存在する波の上限
+// 光だまり：自機の周りでグリッドがほのかに明るくなる
+var GRID_POOL_R = 220;           // 光だまりの半径（px）
+var GRID_POOL_BOOST = 0.3;       // 中心での明るさの増加割合（通常の約3割増し）
+// エネルギーの流れ：グリッドの線の上を光の筋が流れる
+var GRID_FLOW_INTERVAL = [2.5, 4]; // 発生間隔（秒。ランダム範囲）
+var GRID_FLOW_MAX = 2;           // 同時に流れる筋の上限
+var GRID_FLOW_LEN = [120, 200];  // 筋の長さ（px。ランダム範囲）
+var GRID_FLOW_SPEED = 300;       // 筋の流れる速さ（px/秒）
+// 呼吸：グリッド全体の明るさのゆっくりした上下
+var GRID_BREATHE_PERIOD = 6;     // 周期（秒）
+var GRID_BREATHE_AMP = 0.1;      // 明るさの振れ幅（±10%）
+
 // ---- 演出の数値（衝撃波リング・シェイク） ----
 var RING_BASE_SPEED = 2600, RING_SPEED_PER_TIER = 800;  // 耐久1で2600、耐久3で3400
 var RING_BASE_WIDTH = 25, RING_WIDTH_PER_TIER = 10;     // 耐久1で太さ25、耐久3で35
