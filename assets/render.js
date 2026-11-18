@@ -40,6 +40,40 @@ function drawBulletTrails(gold, outerColor, innerColor) {
   ctx.stroke();
 }
 
+// グリッドのパスを、歪みとボスの波動による変位込みで組み立てる。
+// 線を24pxごとの折れ線にすることで、直線ではなく「たわむ・うねる」線になる。
+function buildGridPath(camX, camY) {
+  var step = 24;
+  var x0 = Math.max(0, camX - VIEW_W / 2), x1 = Math.min(WORLD_W, camX + VIEW_W / 2);
+  var y0 = Math.max(0, camY - VIEW_H / 2), y1 = Math.min(WORLD_H, camY + VIEW_H / 2);
+  var gx0 = Math.max(0, Math.floor((camX - VIEW_W / 2) / 60) * 60);
+  var gx1 = Math.min(WORLD_W, camX + VIEW_W / 2 + 60);
+  var gy0 = Math.max(0, Math.floor((camY - VIEW_H / 2) / 60) * 60);
+  var gy1 = Math.min(WORLD_H, camY + VIEW_H / 2 + 60);
+  var gx, gy, xx, yy, first;
+  ctx.beginPath();
+  for (gx = gx0; gx <= gx1; gx += 60) {
+    first = true;
+    for (yy = y0; ; yy += step) {
+      var cy = Math.min(yy, y1);
+      computeGridOffset(gx, cy);
+      if (first) { ctx.moveTo(gx + _gridOffX, cy + _gridOffY); first = false; }
+      else ctx.lineTo(gx + _gridOffX, cy + _gridOffY);
+      if (cy >= y1) break;
+    }
+  }
+  for (gy = gy0; gy <= gy1; gy += 60) {
+    first = true;
+    for (xx = x0; ; xx += step) {
+      var cx = Math.min(xx, x1);
+      computeGridOffset(cx, gy);
+      if (first) { ctx.moveTo(cx + _gridOffX, gy + _gridOffY); first = false; }
+      else ctx.lineTo(cx + _gridOffX, gy + _gridOffY);
+      if (cx >= x1) break;
+    }
+  }
+}
+
 /* ============================================================
    描画
    カメラは自機を常に中心に捉える。自機がワールド端に寄っても
@@ -64,17 +98,79 @@ function draw() {
   ctx.fillStyle = "#050914";
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // グリッド（画面内だけ描く）
-  var gx0 = Math.max(0, Math.floor((camX - VIEW_W / 2) / 60) * 60);
-  var gx1 = Math.min(WORLD_W, camX + VIEW_W / 2 + 60);
-  var gy0 = Math.max(0, Math.floor((camY - VIEW_H / 2) / 60) * 60);
-  var gy1 = Math.min(WORLD_H, camY + VIEW_H / 2 + 60);
-  ctx.strokeStyle = "rgba(34, 230, 255, " + (0.07 + gridPulse * 0.16) + ")";
+  // グリッド（画面内だけ描く）。明るさは「呼吸」で±10%ゆっくり上下し、
+  // 線の位置は歪みとボスの波動で変位する（buildGridPath）。
+  var breathe = 1 + GRID_BREATHE_AMP * Math.sin(gridFxTime * Math.PI * 2 / GRID_BREATHE_PERIOD);
+  var gridAlpha = (0.07 + gridPulse * 0.16) * breathe;
+  ctx.strokeStyle = "rgba(34, 230, 255, " + clamp(gridAlpha, 0, 1).toFixed(4) + ")";
   ctx.lineWidth = 1 + gridPulse * 0.6;
-  ctx.beginPath();
-  for (var gx = gx0; gx <= gx1; gx += 60) { ctx.moveTo(gx, Math.max(0, camY - VIEW_H / 2)); ctx.lineTo(gx, Math.min(WORLD_H, camY + VIEW_H / 2)); }
-  for (var gy = gy0; gy <= gy1; gy += 60) { ctx.moveTo(Math.max(0, camX - VIEW_W / 2), gy); ctx.lineTo(Math.min(WORLD_W, camX + VIEW_W / 2), gy); }
+  buildGridPath(camX, camY);
   ctx.stroke();
+  // 光だまり：自機の周り半径220pxだけ、同じグリッドを約3割増しの
+  // 明るさで重ね描きする（円で切り抜くので端に向けて自然に消える
+  // よう、縁に柔らかいグラデーションの光も添える）
+  ctx.save();
+  ctx.beginPath(); ctx.arc(player.x, player.y, GRID_POOL_R, 0, Math.PI * 2); ctx.clip();
+  ctx.strokeStyle = "rgba(34, 230, 255, " + clamp(gridAlpha * GRID_POOL_BOOST, 0, 1).toFixed(4) + ")";
+  ctx.lineWidth = 1 + gridPulse * 0.6;
+  buildGridPath(camX, camY);
+  ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  var poolGrad = ctx.createRadialGradient(player.x, player.y, 0, player.x, player.y, GRID_POOL_R);
+  poolGrad.addColorStop(0, "rgba(120, 240, 255, 0.05)");
+  poolGrad.addColorStop(0.7, "rgba(34, 230, 255, 0.02)");
+  poolGrad.addColorStop(1, "rgba(34, 230, 255, 0)");
+  ctx.fillStyle = poolGrad;
+  ctx.beginPath(); ctx.arc(player.x, player.y, GRID_POOL_R, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // 波紋：出来事の場所から広がる光の輪（最大半径500・約0.8秒で消える）
+  for (var gri = 0; gri < gridRipples.length; gri++) {
+    var grp = gridRipples[gri];
+    ctx.save();
+    ctx.globalAlpha = Math.max(grp.life, 0) / grp.maxLife * 0.55;
+    ctx.strokeStyle = grp.color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(grp.x, grp.y, grp.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  // ボス登場時の波動の氷色の光：波面の通り道をほのかに光らせる
+  // （線そのもののうねりは buildGridPath の変位で付けている）
+  for (var gwi = 0; gwi < bossWaves.length; gwi++) {
+    var gwv = bossWaves[gwi];
+    var gwFade = Math.max(gwv.life, 0) / gwv.maxLife;
+    ctx.save();
+    ctx.globalAlpha = gwFade * 0.16;
+    ctx.strokeStyle = "#aee9ff";
+    ctx.lineWidth = BOSS_WAVE_BAND * 0.7;
+    ctx.beginPath(); ctx.arc(gwv.x, gwv.y, gwv.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = gwFade * 0.5;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(gwv.x, gwv.y, gwv.r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+  // エネルギーの流れ：グリッドの線の上を光の筋が流れる（最大2本・控えめ）
+  for (var gfi = 0; gfi < gridFlows.length; gfi++) {
+    var gfl = gridFlows[gfi];
+    var tailPos = gfl.pos - gfl.dir * gfl.len;
+    var fx1, fy1, fx2, fy2;
+    if (gfl.horiz) {
+      computeGridOffset(gfl.pos, gfl.line);
+      fx1 = tailPos; fy1 = gfl.line + _gridOffY; fx2 = gfl.pos; fy2 = gfl.line + _gridOffY;
+    } else {
+      computeGridOffset(gfl.line, gfl.pos);
+      fx1 = gfl.line + _gridOffX; fy1 = tailPos; fx2 = gfl.line + _gridOffX; fy2 = gfl.pos;
+    }
+    var flowGrad = ctx.createLinearGradient(fx1, fy1, fx2, fy2);
+    flowGrad.addColorStop(0, "rgba(34, 230, 255, 0)");
+    flowGrad.addColorStop(1, "rgba(140, 245, 255, 0.55)");
+    ctx.save();
+    ctx.strokeStyle = flowGrad;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(fx1, fy1); ctx.lineTo(fx2, fy2); ctx.stroke();
+    ctx.restore();
+  }
 
   // パララックス遠層グリッド：カメラの動きに少し遅れて流れる大きな格子で
   // 奥行きを出す（本グリッドより大きく・薄く、雰囲気は変えない）

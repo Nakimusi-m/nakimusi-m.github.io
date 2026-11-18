@@ -32,23 +32,62 @@ function buildEnemySprite(t, flash) {
   var pts = shapePoints({ shape: t.shape, r: t.r, rot: 0 });
   return makeSprite(half * 2, half * 2, function (g) {
     var main = flash ? "#ffffff" : t.color;
-    // 上位種の装甲：本体の周囲（斜め4方向）に四角い装甲板を付ける
+    // 上位種の装甲（確定デザイン）：元の図形はそのままに、各辺の中央へ
+    // 四角い装甲板が辺をまたいで乗る形。板は辺の長さの半分ほどで、
+    // 本体より一段濃い色に縁だけネオンに光らせ、「後付けの装甲」感を
+    // 出す。角は覆わず鋭いまま残す。板はスプライトの一部として描く
+    // ため、本体と一緒に回転する（当たり判定・大きさは不変）。
+    function darkerShade(hex, f) {
+      var n = parseInt(hex.slice(1), 16);
+      var rr = Math.round(((n >> 16) & 255) * f), gg = Math.round(((n >> 8) & 255) * f), bb = Math.round((n & 255) * f);
+      return "rgb(" + rr + "," + gg + "," + bb + ")";
+    }
+    function drawArmorPlate(cx, cy, size, angle) {
+      g.save();
+      g.translate(cx, cy);
+      g.rotate(angle);
+      g.shadowColor = t.color; g.shadowBlur = 7;
+      g.fillStyle = flash ? "#ffffff" : darkerShade(t.color, 0.45); // 本体より一段濃い板
+      g.globalAlpha = flash ? 0.9 : 0.88;
+      g.fillRect(-size / 2, -size / 2, size, size);
+      g.globalAlpha = 1;
+      g.lineWidth = 2;
+      g.strokeStyle = main; // 縁だけネオンに光る
+      g.strokeRect(-size / 2, -size / 2, size, size);
+      g.restore();
+    }
     function drawEliteArmor() {
       if (!t.elite) return;
-      var ad = t.r * 1.22, asz = t.r * 0.42;
-      g.save();
-      g.shadowColor = t.color; g.shadowBlur = 8;
-      g.lineWidth = 2.2; g.strokeStyle = main;
-      g.fillStyle = t.color; 
-      for (var ai = 0; ai < 4; ai++) {
-        var aa = Math.PI / 4 + ai * Math.PI / 2 + (t.shape === "star" ? 0.3 : 0);
-        var ax = Math.cos(aa) * ad, ay = Math.sin(aa) * ad;
-        g.save(); g.translate(ax, ay); g.rotate(aa + Math.PI / 4);
-        g.globalAlpha = 0.22; g.fillRect(-asz / 2, -asz / 2, asz, asz);
-        g.globalAlpha = 1; g.strokeRect(-asz / 2, -asz / 2, asz, asz);
-        g.restore();
+      var ai, a1, a2;
+      if (t.shape === "aegis") {
+        // イージス：本体（円）の下半分・側面の縁に板を置き、さらに
+        // 正面の盾の縁にも四角を並べて「要塞の壁」のように見せる
+        var bodyR = t.r * 0.72;
+        var bodyAngles = [0, Math.PI / 4, Math.PI / 2, Math.PI * 0.75, Math.PI];
+        for (ai = 0; ai < bodyAngles.length; ai++) {
+          a1 = bodyAngles[ai];
+          drawArmorPlate(Math.cos(a1) * bodyR, 5 + Math.sin(a1) * bodyR, t.r * 0.34, a1 + Math.PI / 2);
+        }
+        var shieldR = t.r * 1.05;
+        var shieldAngles = [-Math.PI * 0.94, -Math.PI * 0.75, -Math.PI / 2, -Math.PI * 0.25, -Math.PI * 0.06];
+        for (ai = 0; ai < shieldAngles.length; ai++) {
+          a2 = shieldAngles[ai];
+          drawArmorPlate(Math.cos(a2) * shieldR, Math.sin(a2) * shieldR, t.r * 0.4, a2 + Math.PI / 2);
+        }
+        return;
       }
-      g.restore();
+      // デッドアイ（矢じり）／サイクロン（星＝渦の腕）：図形の各辺の
+      // 中央に、辺をまたいで板を乗せる。デッドアイは小さめの四角で
+      // 装甲化した矢じりに、サイクロンは腕の辺に付けて歯車めかせる。
+      var pts2 = shapePoints({ shape: t.shape, r: t.r, rot: 0 });
+      var sizeMul = t.shape === "arrowhead" ? 0.38 : 0.45; // 辺の長さに対する板の大きさ
+      for (ai = 0; ai < pts2.length; ai++) {
+        var p1 = pts2[ai], p2 = pts2[(ai + 1) % pts2.length];
+        var edx = p2[0] - p1[0], edy = p2[1] - p1[1];
+        var elen = Math.sqrt(edx * edx + edy * edy);
+        if (elen < 0.01) continue;
+        drawArmorPlate((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, elen * sizeMul, Math.atan2(edy, edx));
+      }
     }
     // フロスター（snowflake）も他の敵と共通の描き方にする：
     // shapePoints の12点星型（氷の結晶のシルエット）を、輪郭線＋
