@@ -13,6 +13,82 @@ var healBeams = [];
 var stepperGhosts = [];
 // カプセル取得時の光の筋 {x1,y1,life,maxLife,color}：取得位置から自機へ吸い込まれる
 var pickupStreaks = [];
+// ---- グリッド背景の演出オブジェクト（見た目のみ） ----
+// 波紋 {x,y,color,life,maxLife,r}／歪み {x,y,r,amp,blastRadius,life,maxLife}／
+// ボスの波動 {x,y,r,life,maxLife}／エネルギーの流れ {horiz,line,pos,dir,len,speed}
+var gridRipples = [];
+var gridDistortions = [];
+var bossWaves = [];
+var gridFlows = [];
+var bossWaveEmitter = null; // {x,y,t,count}：登場後約1.5秒で最大3波を出す
+var gridFlowTimer = 2.8;    // 次のエネルギーの流れまでの残り時間
+var gridFxTime = 0;         // グリッド演出の経過時間（呼吸の位相に使う）
+// グリッドの変位（歪み＋ボスの波動）を1点ぶん計算し、_gridOffX/Y へ返す
+var _gridOffX = 0, _gridOffY = 0;
+function computeGridOffset(x, y) {
+  _gridOffX = 0; _gridOffY = 0;
+  var i, dx, dy, d, fall, env, str;
+  for (i = 0; i < gridDistortions.length; i++) {
+    var dz = gridDistortions[i];
+    dx = x - dz.x; dy = y - dz.y;
+    d = Math.sqrt(dx * dx + dy * dy);
+    if (d >= dz.r || d < 0.01) continue;
+    fall = 1 - d / dz.r;
+    fall = fall * fall * (3 - 2 * fall); // 端で滑らかに0になる
+    env = Math.max(dz.life, 0) / dz.maxLife; // 出た瞬間が最大で、時間で戻る
+    str = dz.amp * env * fall;
+    _gridOffX += dx / d * str;
+    _gridOffY += dy / d * str;
+  }
+  for (i = 0; i < bossWaves.length; i++) {
+    var wv = bossWaves[i];
+    dx = x - wv.x; dy = y - wv.y;
+    d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 0.01) continue;
+    var diff = d - wv.r;
+    if (diff > BOSS_WAVE_BAND || diff < -BOSS_WAVE_BAND) continue;
+    var k = 1 - Math.abs(diff) / BOSS_WAVE_BAND;
+    var fade = Math.max(wv.life, 0) / wv.maxLife;
+    // 波面で最大になる外向きの膨らみ＝線そのものが波打って見える
+    str = BOSS_WAVE_AMP * k * k * fade;
+    _gridOffX += dx / d * str;
+    _gridOffY += dy / d * str;
+  }
+}
+// 波紋を出す（上限を超える時は一番古いものを消す）
+function spawnGridRipple(x, y, color) {
+  if (gridRipples.length >= GRID_RIPPLE_MAX) gridRipples.shift();
+  gridRipples.push({ x: x, y: y, color: color, life: GRID_RIPPLE_LIFE, maxLife: GRID_RIPPLE_LIFE, r: 0 });
+}
+// 歪みを出す：歪みの半径とたわみ量は爆発の規模（爆発半径）に比例する
+function spawnGridDistortion(x, y, blastRadius) {
+  if (gridDistortions.length >= GRID_DISTORT_MAX) gridDistortions.shift();
+  var amp = GRID_DISTORT_REF_AMP * Math.pow(blastRadius / GRID_DISTORT_REF_R, GRID_DISTORT_AMP_EXP);
+  var dur = GRID_DISTORT_TIME_MIN + clamp((blastRadius - GRID_DISTORT_REF_R) / (BOSS_FINAL_BLAST_R - GRID_DISTORT_REF_R), 0, 1) * (GRID_DISTORT_TIME_MAX - GRID_DISTORT_TIME_MIN);
+  gridDistortions.push({ x: x, y: y, blastRadius: blastRadius, r: blastRadius * GRID_DISTORT_RATIO, amp: amp, life: dur, maxLife: dur });
+}
+// ボス登場時の波動を開始する（約1.5秒の間に最大3波を順に出す）
+function spawnBossWaves(x, y) {
+  bossWaveEmitter = { x: x, y: y, t: 0, count: 0 };
+}
+function spawnBossWave(x, y) {
+  if (bossWaves.length >= BOSS_WAVE_MAX) bossWaves.shift();
+  bossWaves.push({ x: x, y: y, r: 0, life: BOSS_WAVE_MAX_R / BOSS_WAVE_SPEED, maxLife: BOSS_WAVE_MAX_R / BOSS_WAVE_SPEED });
+}
+// エネルギーの流れを1本出す：カメラ範囲内のグリッド線（60px格子）に沿わせる
+function spawnGridFlow() {
+  if (gridFlows.length >= GRID_FLOW_MAX || !player) return;
+  var horiz = Math.random() < 0.5;
+  var len = rand(GRID_FLOW_LEN[0], GRID_FLOW_LEN[1]);
+  var dir = Math.random() < 0.5 ? -1 : 1;
+  if (horiz) {
+    var ly = clamp(Math.round((player.y + rand(-VIEW_H / 2, VIEW_H / 2)) / 60) * 60, 0, WORLD_H);
+    gridFlows.push({ horiz: true, line: ly, pos: dir > 0 ? player.x - VIEW_W / 2 - len : player.x + VIEW_W / 2, dir: dir, len: len, speed: GRID_FLOW_SPEED });
+  } else {
+    var lx = clamp(Math.round((player.x + rand(-VIEW_W / 2, VIEW_W / 2)) / 60) * 60, 0, WORLD_W);
+    gridFlows.push({ horiz: false, line: lx, pos: dir > 0 ? player.y - VIEW_H / 2 - len : player.y + VIEW_H / 2, dir: dir, len: len, speed: GRID_FLOW_SPEED });
+  }
+}
 // 被弾方向表示：最後に当たった方向（自機→発生源の角度）と残り表示時間
 var damageDirAngle = 0, damageDirT = 0;
 // ゲーム中のベスト更新バナー
@@ -95,6 +171,42 @@ function updateFx(dt) {
   }
   if (damageDirT > 0) damageDirT -= dt;
   if (recordBannerT > 0) recordBannerT -= dt;
+  // グリッド背景の演出の更新（波紋・歪み・ボスの波動・エネルギーの流れ・呼吸）
+  gridFxTime += dt;
+  for (i = gridRipples.length - 1; i >= 0; i--) {
+    gridRipples[i].life -= dt;
+    gridRipples[i].r = Math.min((gridRipples[i].maxLife - Math.max(gridRipples[i].life, 0)) * GRID_RIPPLE_SPEED, GRID_RIPPLE_MAX_R);
+    if (gridRipples[i].life <= 0) gridRipples.splice(i, 1);
+  }
+  for (i = gridDistortions.length - 1; i >= 0; i--) {
+    gridDistortions[i].life -= dt;
+    if (gridDistortions[i].life <= 0) gridDistortions.splice(i, 1);
+  }
+  if (bossWaveEmitter) {
+    bossWaveEmitter.t += dt;
+    while (bossWaveEmitter.count < BOSS_WAVE_COUNT && bossWaveEmitter.t >= bossWaveEmitter.count * BOSS_WAVE_INTERVAL) {
+      spawnBossWave(bossWaveEmitter.x, bossWaveEmitter.y);
+      bossWaveEmitter.count++;
+    }
+    if (bossWaveEmitter.count >= BOSS_WAVE_COUNT) bossWaveEmitter = null;
+  }
+  for (i = bossWaves.length - 1; i >= 0; i--) {
+    bossWaves[i].r += BOSS_WAVE_SPEED * dt;
+    bossWaves[i].life -= dt;
+    if (bossWaves[i].life <= 0 || bossWaves[i].r >= BOSS_WAVE_MAX_R) bossWaves.splice(i, 1);
+  }
+  gridFlowTimer -= dt;
+  if (gridFlowTimer <= 0) {
+    spawnGridFlow();
+    gridFlowTimer = rand(GRID_FLOW_INTERVAL[0], GRID_FLOW_INTERVAL[1]);
+  }
+  for (i = gridFlows.length - 1; i >= 0; i--) {
+    var gf = gridFlows[i];
+    gf.pos += gf.dir * gf.speed * dt;
+    var camC = gf.horiz ? (player ? player.x : gf.pos) : (player ? player.y : gf.pos);
+    var viewHalf = gf.horiz ? VIEW_W / 2 : VIEW_H / 2;
+    if (gf.pos - gf.len > camC + viewHalf + 30 || gf.pos + gf.len < camC - viewHalf - 30) gridFlows.splice(i, 1);
+  }
   // コンボの残り時間・ポップ、グリッド脈動、マズルの減衰
   if (state === "playing") {
     if (comboTimer > 0) {
@@ -125,6 +237,7 @@ function activateOverdrive() {
   spawnRing(player.x, player.y, "#ffc233", 3);
   burst(player.x, player.y, "#ffc233", 22);
   gridPulse = 1;
+  spawnGridRipple(player.x, player.y, "#ffc233"); // OD発動：金色の波紋がグリッドを広がる
   sfxOverdriveStart();
 }
 
@@ -178,6 +291,7 @@ function killEnemy(e) {
     // 大きな敵：小さな衝撃波（白い輪）＋短いヒットストップ
     hitStop = BIG_KILL_HITSTOP;
     spawnRing(e.x, e.y, "#ffffff", 2);
+    spawnGridRipple(e.x, e.y, e.color); // 大型撃破：敵の色の波紋がグリッドを広がる
   } else if (big) {
     hitStop = e.maxHp >= 10 ? 0.08 : 0.06; // 一瞬だけ時を止める
   }
@@ -251,6 +365,7 @@ function bomberBlast(e) {
   spawnRing(e.x, e.y, e.color, 3); // 爆発の輪は大リング相当
   spawnSparks(e.x, e.y, e.color, 9);
   gridPulse = 1;
+  spawnGridDistortion(e.x, e.y, BOMBER_RADIUS); // 爆発の規模（半径130）に比例した歪み
   // まず巻き込む敵を確定させてから処理する（分裂で増えた敵を
   // 同じ爆発で巻き込まないため）
   var targets = [];

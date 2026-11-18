@@ -310,6 +310,8 @@ function resetGame() {
   frostZones = [];
   healBeams = []; stepperGhosts = [];
   pickupStreaks = []; damageDirT = 0; recordBannerT = 0; recordShown = false; arcCrackleT = 0;
+  gridRipples = []; gridDistortions = []; bossWaves = []; gridFlows = [];
+  bossWaveEmitter = null; gridFlowTimer = 2.8; gridFxTime = 0;
   introT = 0; dyingT = 0; overCountT = -1; engineAcc = 0;
   comboCount = 0; comboTimer = 0; comboPop = 0;
   hitStop = 0; gridPulse = 0; flashWhite = 0;
