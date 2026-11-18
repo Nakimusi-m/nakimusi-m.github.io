@@ -99,6 +99,9 @@ function spawnBoss() {
   enemyBullets = [];
   spawnRing(boss.x, boss.y, "#7fd8ff", 6);
   burst(boss.x, boss.y, "#7fd8ff", 26);
+  // 登場の衝撃波：規模に比例したグリッドの歪み＋ボス中心の波動（約1.5秒・最大3波）
+  spawnGridDistortion(boss.x, boss.y, BOSS_SPAWN_BLAST_R);
+  spawnBossWaves(boss.x, boss.y);
   shake = Math.max(shake, 20);
   // ボス戦開始：オーバードライブを強制終了し、ゲージを0にする（正面勝負）
   if (odActive) sfxOverdriveEnd();
@@ -326,6 +329,7 @@ function destroyTurret(tr) {
   burst(tr.x, tr.y, "#7fd8ff", 22);
   spawnRing(tr.x, tr.y, "#7fd8ff", 4);
   spawnRing(tr.x, tr.y, "#ffffff", 2); // 大型撃破の小さな衝撃波
+  spawnGridRipple(tr.x, tr.y, "#7fd8ff"); // 砲塔撃破：氷色の波紋がグリッドを広がる
   hitStop = BIG_KILL_HITSTOP; // 大型撃破の短いヒットストップ
   spawnSparks(tr.x, tr.y, "#d8f6ff", 9);
   sfxExplosionTier(2);
@@ -371,6 +375,7 @@ function enterExecution() {
   if (bossWrapEl) bossWrapEl.className = "shatter";
   hitStop = 0.09;
   shake = Math.max(shake, 24);
+  spawnGridRipple(b.x, b.y, "#7fd8ff"); // 本体を倒し切った：氷色の波紋がグリッドを広がる
   spawnRing(b.x, b.y, "#ffc233", 6);
   burst(b.x, b.y, "#7fd8ff", 30);
   sfxExplosion(true);
@@ -398,6 +403,8 @@ function finishBoss() {
   popups.push({ x: b.x, y: b.y - 20, text: "+" + BOSS_SCORE_FINAL, life: 1.3, maxLife: 1.3, pop: 1, big: true, huge: true, color: "#ffc233" });
   if (popups.length >= MAX_POPUPS) popups.shift();
   popups.push({ x: player.x, y: player.y - 26, text: "HP +" + BOSS_HEAL, life: 1.0, maxLife: 1.0, pop: 1, big: true, color: "#3dff7a" });
+  spawnGridDistortion(b.x, b.y, BOSS_FINAL_BLAST_R); // 大爆発の規模に比例した最大の歪み
+  spawnGridRipple(b.x, b.y, "#7fd8ff"); // 大爆発：氷色の波紋がグリッドを広がる
   flashWhite = 1; // 画面全体の白フラッシュ（fx.js で減衰、render.js で描画）
   for (var i = 0; i < 4; i++) burst(b.x + rand(-46, 46), b.y + rand(-46, 46), i === 0 ? "#ffc233" : "#7fd8ff", 24);
   spawnRing(b.x, b.y, "#ffc233", 6);
